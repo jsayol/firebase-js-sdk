@@ -32,7 +32,7 @@ import { errorPrefix, validateArgCount, validateCallback, validateContextObject 
 import { ValueEventRegistration, ChildEventRegistration, EventRegistration } from '../core/view/EventRegistration';
 import { Deferred, attachDummyErrorHandler } from '../../utils/promise';
 import { Repo } from '../core/Repo';
-import { QueryParams } from '../core/view/QueryParams';
+import { QueryParams, QueryParamsJSON } from '../core/view/QueryParams';
 import { Reference } from './Reference';
 import { DataSnapshot } from './DataSnapshot';
 
@@ -57,6 +57,12 @@ export class Query {
     assert(__referenceConstructor, 'Reference.ts has not been loaded');
     return __referenceConstructor;
   }
+
+  static defaultAtPath(path: Path, repo?: Repo): Query {
+    return new Query(repo, path, QueryParams.DEFAULT, false);
+  }
+
+  static DefaultIdentifier = 'default';
 
   constructor(public repo: Repo, public path: Path, private queryParams_: QueryParams, private orderByCalled_: boolean) {}
 
@@ -466,6 +472,19 @@ export class Query {
     return this.toString();
   }
 
+  toJSONObject(): QueryJSON {
+    return {
+      path: this.path.toString(),
+      params: this.queryParams_.toJSON()
+    };
+  }
+
+  static fromJSON(json: QueryJSON, repo?: Repo): Query {
+    const path = new Path(json.path);
+    const queryParams = QueryParams.fromJSON(json.params);
+    return new Query(repo, path, queryParams, false);
+  }
+
   /**
    * An object representation of the query parameters used by this Query.
    * @return {!Object}
@@ -480,7 +499,7 @@ export class Query {
   queryIdentifier(): string {
     const obj = this.queryObject();
     const id = ObjectToUniqueKey(obj);
-    return (id === '{}') ? 'default' : id;
+    return (id === '{}') ? Query.DefaultIdentifier : id;
   }
 
   /**
@@ -535,4 +554,9 @@ export class Query {
   get ref(): Reference {
     return this.getRef();
   }
+}
+
+export interface QueryJSON {
+  path: string;
+  params: QueryParamsJSON;
 }

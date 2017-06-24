@@ -106,6 +106,7 @@ export class RepoManager {
       fatal("Database " + repo.app.name + " has already been deleted.");
     }
     repo.interrupt();
+    repo.closePersistence();
     delete this.repos_[repo.app.name];
   }
 

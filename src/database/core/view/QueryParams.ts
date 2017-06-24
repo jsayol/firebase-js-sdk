@@ -29,6 +29,7 @@ import { RangedFilter } from './filter/RangedFilter';
 import { stringify } from '../../../utils/json';
 import { NodeFilter } from './filter/NodeFilter';
 import { Index } from '../snap/indexes/Index';
+import { Path } from '../util/Path';
 
 /**
  * This class is an immutable-from-the-public-api struct containing a set of query parameters defining a
@@ -425,4 +426,77 @@ export class QueryParams {
 
     return qs;
   }
+
+  /**
+   * Returns a JSON serializable representation of this query parameters
+   *
+   * @return {Object}
+   */
+  toJSON(): QueryParamsJSON {
+    return {
+      limitSet_: this.limitSet_,
+      limit_: this.limit_,
+      startSet_: this.startSet_,
+      indexStartValue_: this.indexStartValue_,
+      startNameSet_: this.startNameSet_,
+      indexStartName_: this.indexStartName_,
+      endSet_: this.endSet_,
+      indexEndValue_: this.indexEndValue_,
+      endNameSet_: this.endNameSet_,
+      indexEndName_: this.indexEndName_,
+      viewFrom_: this.viewFrom_,
+      index_: this.index_.toString()
+    };
+  }
+
+  /**
+   * The string (serialized) representation of this object
+   *
+   * @return {string}
+   */
+  toString(): string {
+    return stringify(this.toJSON());
+  }
+
+  /**
+   * Creates a new QueryParams object from a previously serialized one
+   *
+   * @param json
+   * @return {QueryParams}
+   */
+  static fromJSON(json: QueryParamsJSON): QueryParams {
+    let index: Index;
+
+    switch (json.index_) {
+      case '.priority':
+        index = PRIORITY_INDEX;
+        break;
+      case '.key':
+        index = KEY_INDEX;
+        break;
+      case '.value':
+        index = VALUE_INDEX;
+        break;
+      default:
+        // If it's neither of those then it's a path
+        index = new PathIndex(new Path(json.index_));
+    }
+
+    return QueryParams.prototype.copy_.call({...json, index_: index});
+  }
+}
+
+export interface QueryParamsJSON {
+  limitSet_: boolean;
+  limit_: number;
+  startSet_: boolean;
+  indexStartValue_: any | null;
+  startNameSet_: boolean;
+  indexStartName_: string;
+  endSet_: boolean;
+  indexEndValue_: any | null;
+  endNameSet_: boolean;
+  indexEndName_: string;
+  viewFrom_: string;
+  index_: string;
 }

@@ -276,7 +276,8 @@ function compileMetaFiles() {
 }
 
 function injectSDKVersion() {
-  return gulp.src('./dist/package/**/*', {base: '.'})
+  // TODO(jsayol): remove "browser" from src
+  return gulp.src(['./dist/package/**/*', './dist/browser/**/*'], {base: '.'})
     .pipe(replace(/\${JSCORE_VERSION}/g, config.pkg.version))
     .pipe(gulp.dest('.'));
 }

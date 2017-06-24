@@ -15,7 +15,7 @@
 */
 
 import { IndexedFilter } from './filter/IndexedFilter';
-import { ViewProcessor } from './ViewProcessor';
+import { ProcessorResult, ViewProcessor } from './ViewProcessor';
 import { ChildrenNode } from '../snap/ChildrenNode';
 import { CacheNode } from './CacheNode';
 import { ViewCache } from './ViewCache';
@@ -120,6 +120,13 @@ export class View {
   };
 
   /**
+   * @return {!Node}
+   */
+  getEventCache(): Node {
+    return this.viewCache_.getEventCache().getNode();
+  }
+
+  /**
    * @return {boolean}
    */
   isEmpty(): boolean {
@@ -179,7 +186,8 @@ export class View {
    * @param {?Node} completeServerCache
    * @return {!Array.<!Event>}
    */
-  applyOperation(operation: Operation, writesCache: WriteTreeRef, completeServerCache: Node | null): Event[] {
+  applyOperation(operation: Operation, writesCache: WriteTreeRef,
+                 completeServerCache: Node | null): { result: ProcessorResult, events: Event[] } {
     if (operation.type === OperationType.MERGE &&
       operation.source.queryId !== null) {
 
@@ -199,7 +207,10 @@ export class View {
 
     this.viewCache_ = result.viewCache;
 
-    return this.generateEventsForChanges_(result.changes, result.viewCache.getEventCache().getNode(), null);
+    const events = this.generateEventsForChanges_(result.changes,
+      result.viewCache.getEventCache().getNode(), null);
+
+    return {result, events};
   };
 
   /**

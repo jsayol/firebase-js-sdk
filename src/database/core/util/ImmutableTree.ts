@@ -353,4 +353,19 @@ export class ImmutableTree<T> {
       }
     });
   }
+
+  /**
+   * Checks if there's any matching value in the tree for the given predicate
+   *
+   * @param fn
+   * @return {boolean}
+   */
+  containsValueMatching(fn: (value: T) => boolean): boolean {
+    if (fn(this.value)) {
+      return true;
+    }
+
+    return this.children.inorderTraversal(
+      (name: string, child: ImmutableTree<T>) => child.containsValueMatching(fn));
+  }
 }

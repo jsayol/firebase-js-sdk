@@ -164,7 +164,7 @@ export const enableLogging = function (logger_?: boolean | ((a: string) => void)
  *
  * @param {...(string|Arguments)} var_args
  */
-export const log = function (...var_args: string[]) {
+export const log = function (...var_args: any[]) {
   if (firstLog_ === true) {
     firstLog_ = false;
     if (logger === null && SessionStorage.get('logging_enabled') === true)

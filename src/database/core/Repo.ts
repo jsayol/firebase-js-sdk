@@ -24,6 +24,7 @@ import { Path } from './util/Path';
 import { SparseSnapshotTree } from './SparseSnapshotTree';
 import { SyncTree } from './SyncTree';
 import { SnapshotHolder } from './SnapshotHolder';
+import { assert } from '../../utils/assert';
 import { stringify } from '../../utils/json';
 import { beingCrawled, each, exceptionGuard, warn, log } from './util/util';
 import { map, forEach, isEmpty } from '../../utils/obj';
@@ -43,6 +44,9 @@ import { EventRegistration } from './view/EventRegistration';
 import { StatsCollection } from './stats/StatsCollection';
 import { Event } from './view/Event';
 import { Node } from './snap/Node';
+import { PersistenceManager } from '../persistence/PersistenceManager';
+import { StorageAdapter } from '../persistence/storage/StorageAdapter';
+import { PersistedUserWrite } from '../persistence/UserWriteStore';
 
 const INTERRUPT_REASON = 'repo_interrupt';
 
@@ -51,6 +55,7 @@ const INTERRUPT_REASON = 'repo_interrupt';
  */
 export class Repo {
   dataUpdateCount = 0;
+
   private infoSyncTree_: SyncTree;
   private serverSyncTree_: SyncTree;
 
@@ -70,11 +75,17 @@ export class Repo {
   // A list of data pieces and paths to be set when this client disconnects.
   private onDisconnect_ = new SparseSnapshotTree();
 
+
   /**
    * TODO: This should be @private but it's used by test_access.js and internal.js
    * @type {?PersistentConnection}
    */
   persistentConnection_: PersistentConnection | null = null;
+
+  /**
+   * Persistence manager
+   */
+  private persistenceManager_: PersistenceManager;
 
   /**
    * @param {!RepoInfo} repoInfo_
@@ -306,6 +317,9 @@ export class Repo {
     const newNode = resolveDeferredValueSnapshot(newNodeUnresolved, serverValues);
 
     const writeId = this.getNextWriteId_();
+    if (this.persistenceManager_ !== void 0) {
+      this.persistenceManager_.saveUserOverwrite(path, newNodeUnresolved, writeId);
+    }
     const events = this.serverSyncTree_.applyUserOverwrite(path, newNode, writeId, true);
     this.eventQueue_.queueEvents(events);
     this.server_.put(path.toString(), newNodeUnresolved.val(/*export=*/true), (status, errorReason) => {
@@ -314,7 +328,7 @@ export class Repo {
         warn('set at ' + path + ' failed: ' + status);
       }
 
-      const clearEvents = this.serverSyncTree_.ackUserWrite(writeId, !success);
+      const clearEvents = this.serverSyncTree_.ackUserWrite(writeId, !success, true, this);
       this.eventQueue_.raiseEventsForChangedPath(path, clearEvents);
       this.callOnCompleteCallback(onComplete, status, errorReason);
     });
@@ -339,12 +353,15 @@ export class Repo {
     const changedChildren: { [k: string]: Node } = {};
     forEach(childrenToMerge, (changedKey: string, changedValue: any) => {
       empty = false;
-      const newNodeUnresolved = nodeFromJSON(changedValue);
+      let newNodeUnresolved = nodeFromJSON(changedValue);
       changedChildren[changedKey] = resolveDeferredValueSnapshot(newNodeUnresolved, serverValues);
     });
 
     if (!empty) {
       const writeId = this.getNextWriteId_();
+      if (this.persistenceManager_ !== void 0) {
+        this.persistenceManager_.saveUserMerge(path, changedChildren, writeId);
+      }
       const events = this.serverSyncTree_.applyUserMerge(path, changedChildren, writeId);
       this.eventQueue_.queueEvents(events);
       this.server_.merge(path.toString(), childrenToMerge, (status, errorReason) => {
@@ -353,7 +370,7 @@ export class Repo {
           warn('update at ' + path + ' failed: ' + status);
         }
 
-        const clearEvents = this.serverSyncTree_.ackUserWrite(writeId, !success);
+        const clearEvents = this.serverSyncTree_.ackUserWrite(writeId, !success, true, this);
         const affectedPath = (clearEvents.length > 0) ? this.rerunTransactions_(path) : path;
         this.eventQueue_.raiseEventsForChangedPath(affectedPath, clearEvents);
         this.callOnCompleteCallback(onComplete, status, errorReason);
@@ -466,13 +483,17 @@ export class Repo {
    * @param {!EventRegistration} eventRegistration
    */
   addEventCallbackForQuery(query: Query, eventRegistration: EventRegistration) {
-    let events;
+    let eventsPromise: Promise<Event[]>;
+
     if (query.path.getFront() === '.info') {
-      events = this.infoSyncTree_.addEventRegistration(query, eventRegistration);
+      eventsPromise = this.infoSyncTree_.addEventRegistration(query, eventRegistration);
     } else {
-      events = this.serverSyncTree_.addEventRegistration(query, eventRegistration);
+      eventsPromise = this.serverSyncTree_.addEventRegistration(query, eventRegistration);
     }
-    this.eventQueue_.raiseEventsAtPath(query.path, events);
+
+    eventsPromise.then((events: Event[]) => {
+      this.eventQueue_.raiseEventsAtPath(query.path, events);
+    });
   }
 
   /**
@@ -572,5 +593,83 @@ export class Repo {
   get database(): Database {
     return this.__database || (this.__database = new Database(this));
   }
+
+  enablePersistence(storageAdapter?: StorageAdapter | null) {
+    if (this.persistenceManager_ !== void 0) {
+      warn('Database persistence was already enabled and cannot be changed.');
+      return;
+    }
+
+    try {
+      this.persistenceManager_ = new PersistenceManager(this, storageAdapter);
+    } catch (error) {
+      // Something went wrong when initializing persistence. It's possible that the platform
+      // where we're running doesn't support the storage adapter we're trying to use.
+      this.persistenceManager_ = void 0;
+      warn('Failed to initialize database persistence. It will be disabled.', error);
+
+      // TODO(jsayol): maybe we should offer a way for the user to detect the error programatically,
+      // in case they want to retry enabling persistence with a different storage adapter.
+      return;
+    }
+
+    this.log_('Persistence enabled');
+    this.serverSyncTree_.persistenceManager = this.persistenceManager_;
+    this.restoreWrites_();
+  }
+
+  closePersistence() {
+    if (this.persistenceManager_ !== void 0) {
+      this.persistenceManager_.close();
+    }
+  }
+
+  private restoreWrites_() {
+    this.persistenceManager_.getUserWrites()
+      .then((writes: PersistedUserWrite[]) => {
+        const serverValues = this.generateServerValues();
+        let lastWriteId = Number.NEGATIVE_INFINITY;
+
+        const callback = (write: PersistedUserWrite, op: string, status: string, errorReason: string) => {
+          const success = status === 'ok';
+          if (!success) {
+            warn(`Persisted ${op} at ${write.path} failed: ${status} - ${errorReason}`);
+          }
+
+          const clearEvents = this.serverSyncTree_.ackUserWrite(write.id, !success, true, this);
+          this.eventQueue_.raiseEventsForChangedPath(new Path(write.path), clearEvents);
+        };
+
+        writes.forEach((write: PersistedUserWrite) => {
+          assert(lastWriteId < write.id, 'Restored writes were not in order');
+          lastWriteId = write.id;
+          this.nextWriteId_ = write.id + 1;
+
+          const path = new Path(write.path);
+
+          if (write.overwrite) {
+            this.log_(`Restoring overwrite with id ${write.id} at path ${write.path}`);
+            const unresolvedNode = nodeFromJSON(write.overwrite);
+            const resolvedNode = resolveDeferredValueSnapshot(unresolvedNode, serverValues);
+            this.serverSyncTree_.applyUserOverwrite(path, resolvedNode, write.id, true);
+            this.server_.put(write.path, write.overwrite, callback.bind(this, write, 'set'));
+          } else {
+            this.log_(`Restoring merge with id ${write.id} at path ${write.path}`);
+            const resolvedMerge: { [k: string]: Node } = {};
+            forEach(write.merge, (childPath: string, childNode: Node) => {
+              const unresolvedNode = nodeFromJSON(childNode);
+              resolvedMerge[childPath] = resolveDeferredValueSnapshot(unresolvedNode, serverValues);
+            });
+
+            this.serverSyncTree_.applyUserMerge(path, resolvedMerge, write.id);
+            this.server_.merge(write.path, write.merge, callback.bind(this, write, 'update'));
+          }
+        });
+      })
+      .catch((error: Error) => {
+        warn('Failed to restore persisted user writes', error);
+      });
+  }
+
 }
 

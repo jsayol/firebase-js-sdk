@@ -18,7 +18,7 @@ import { assert } from '../../utils/assert';
 import { errorForServerCode } from './util/util';
 import { AckUserWrite } from './operation/AckUserWrite';
 import { ChildrenNode } from './snap/ChildrenNode';
-import { forEach, safeGet } from '../../utils/obj';
+import { contains, forEach, safeGet } from '../../utils/obj';
 import { ImmutableTree } from './util/ImmutableTree';
 import { ListenComplete } from './operation/ListenComplete';
 import { Merge } from './operation/Merge';
@@ -32,6 +32,11 @@ import { Node } from './snap/Node';
 import { Event } from './view/Event';
 import { EventRegistration } from './view/EventRegistration';
 import { View } from './view/View';
+import { PersistenceManager } from '../persistence/PersistenceManager';
+import { Repo } from './Repo';
+import { resolveDeferredValueSnapshot } from './util/ServerValues';
+import { local } from '../../app/shared_promise';
+import { CacheNode } from './view/CacheNode';
 
 /**
  * @typedef {{
@@ -91,14 +96,28 @@ export class SyncTree {
    */
   private pendingWriteTree_ = new WriteTree();
 
-  private tagToQueryMap_: { [k: string]: string } = {};
+  private tagToQueryMap_: { [k: string]: Query } = {};
   private queryToTagMap_: { [k: string]: number } = {};
+
+  /**
+   * Persistence manager
+   */
+  private persistenceManager_: PersistenceManager;
 
   /**
    * @param {!ListenProvider} listenProvider_ Used by SyncTree to start / stop listening
    *   to server data.
    */
   constructor(private listenProvider_: ListenProvider) {
+  }
+
+  /**
+   * Set the persistence manager to use
+   *
+   * @param manager
+   */
+  set persistenceManager(manager: PersistenceManager) {
+    this.persistenceManager_ = manager;
   }
 
   /**
@@ -144,12 +163,37 @@ export class SyncTree {
    * Acknowledge a pending user write that was previously registered with applyUserOverwrite() or applyUserMerge().
    *
    * @param {!number} writeId
+   * @param {boolean} persist True if the user write involves persistence
+   * @param {Repo=} repo
    * @param {boolean=} revert True if the given write failed and needs to be reverted
    * @return {!Array.<!Event>} Events to raise.
    */
-  ackUserWrite(writeId: number, revert: boolean = false) {
+  ackUserWrite(writeId: number, revert = false, persist = false, repo?: Repo): Event[] {
     const write = this.pendingWriteTree_.getWrite(writeId);
     const needToReevaluate = this.pendingWriteTree_.removeWrite(writeId);
+
+    if (write.visible && (this.persistenceManager_ !== void 0)) {
+      if (persist) {
+        this.persistenceManager_.removeUserWrite(writeId);
+
+        if (!revert) {
+          assert(repo, 'Cannot resolve deferred values without a repo instance');
+          const serverValues = repo.generateServerValues();
+
+          if (write.snap !== void 0) {
+            const resolvedNode = resolveDeferredValueSnapshot(write.snap, serverValues);
+            this.persistenceManager_.applyUserWrite(resolvedNode, write.path);
+          } else {
+            const resolvedMerge: { [k: string]: Node } = {};
+            forEach(write.children, (childPath: string, childNode: Node) => {
+              resolvedMerge[childPath] = resolveDeferredValueSnapshot(childNode, serverValues);
+            });
+            this.persistenceManager_.applyUserMerge(resolvedMerge, write.path);
+          }
+        }
+      }
+    }
+
     if (!needToReevaluate) {
       return [];
     } else {
@@ -173,6 +217,10 @@ export class SyncTree {
    * @return {!Array.<!Event>} Events to raise.
    */
   applyServerOverwrite(path: Path, newData: Node): Event[] {
+    if (this.persistenceManager_ !== void 0) {
+      this.persistenceManager_.applyServerOverwrite(newData, Query.defaultAtPath(path));
+    }
+
     return this.applyOperationToSyncPoints_(
       new Overwrite(OperationSource.Server, path, newData));
   }
@@ -185,6 +233,10 @@ export class SyncTree {
    * @return {!Array.<!Event>} Events to raise.
    */
   applyServerMerge(path: Path, changedChildren: { [k: string]: Node }): Event[] {
+    if (this.persistenceManager_ !== void 0) {
+      this.persistenceManager_.applyServerMerge(changedChildren, path);
+    }
+
     const changeTree = ImmutableTree.fromObject(changedChildren);
 
     return this.applyOperationToSyncPoints_(
@@ -198,6 +250,10 @@ export class SyncTree {
    * @return {!Array.<!Event>} Events to raise.
    */
   applyListenComplete(path: Path): Event[] {
+    if (this.persistenceManager_ !== void 0) {
+      this.persistenceManager_.setQueryComplete(Query.defaultAtPath(path));
+    }
+
     return this.applyOperationToSyncPoints_(
       new ListenComplete(OperationSource.Server, path));
   }
@@ -211,14 +267,20 @@ export class SyncTree {
    * @return {!Array.<!Event>} Events to raise.
    */
   applyTaggedQueryOverwrite(path: Path, snap: Node, tag: number): Event[] {
-    const queryKey = this.queryKeyForTag_(tag);
-    if (queryKey != null) {
-      const r = SyncTree.parseQueryKey_(queryKey);
-      const queryPath = r.path, queryId = r.queryId;
-      const relativePath = Path.relativePath(queryPath, path);
+    const query = this.queryForTag_(tag);
+
+    if (query != null) {
+      const queryId = query.queryIdentifier();
+      const relativePath = Path.relativePath(query.path, path);
+
+      if (this.persistenceManager_ !== void 0) {
+        const queryToOverwrite = relativePath.isEmpty() ? query : Query.defaultAtPath(path);
+        this.persistenceManager_.applyServerOverwrite(snap, queryToOverwrite);
+      }
+
       const op = new Overwrite(OperationSource.forServerTaggedQuery(queryId),
         relativePath, snap);
-      return this.applyTaggedOperation_(queryPath, op);
+      return this.applyTaggedOperation_(query.path, op);
     } else {
       // Query must have been removed already
       return [];
@@ -234,15 +296,21 @@ export class SyncTree {
    * @return {!Array.<!Event>} Events to raise.
    */
   applyTaggedQueryMerge(path: Path, changedChildren: { [k: string]: Node }, tag: number): Event[] {
-    const queryKey = this.queryKeyForTag_(tag);
-    if (queryKey) {
-      const r = SyncTree.parseQueryKey_(queryKey);
-      const queryPath = r.path, queryId = r.queryId;
-      const relativePath = Path.relativePath(queryPath, path);
+    const query = this.queryForTag_(tag);
+
+    if (query != null) {
+      const queryId = query.queryIdentifier();
+      const relativePath = Path.relativePath(query.path, path);
       const changeTree = ImmutableTree.fromObject(changedChildren);
+
+      if (this.persistenceManager_ !== void 0) {
+        this.persistenceManager_.applyServerMerge(changedChildren, path);
+      }
+
       const op = new Merge(OperationSource.forServerTaggedQuery(queryId),
         relativePath, changeTree);
-      return this.applyTaggedOperation_(queryPath, op);
+
+      return this.applyTaggedOperation_(query.path, op);
     } else {
       // We've already removed the query. No big deal, ignore the update
       return [];
@@ -257,14 +325,15 @@ export class SyncTree {
    * @return {!Array.<!Event>} Events to raise.
    */
   applyTaggedListenComplete(path: Path, tag: number): Event[] {
-    const queryKey = this.queryKeyForTag_(tag);
-    if (queryKey) {
-      const r = SyncTree.parseQueryKey_(queryKey);
-      const queryPath = r.path, queryId = r.queryId;
-      const relativePath = Path.relativePath(queryPath, path);
-      const op = new ListenComplete(OperationSource.forServerTaggedQuery(queryId),
+    const query = this.queryForTag_(tag);
+    if (query) {
+      if (this.persistenceManager_ !== void 0) {
+        this.persistenceManager_.setQueryComplete(query);
+      }
+      const relativePath = Path.relativePath(query.path, path);
+      const op = new ListenComplete(OperationSource.forServerTaggedQuery(query.queryIdentifier()),
         relativePath);
-      return this.applyTaggedOperation_(queryPath, op);
+      return this.applyTaggedOperation_(query.path, op);
     } else {
       // We've already removed the query. No big deal, ignore the update
       return [];
@@ -278,60 +347,93 @@ export class SyncTree {
    * @param {!EventRegistration} eventRegistration
    * @return {!Array.<!Event>} Events to raise.
    */
-  addEventRegistration(query: Query, eventRegistration: EventRegistration): Event[] {
+  addEventRegistration(query: Query, eventRegistration: EventRegistration): Promise<Event[]> {
     const path = query.path;
 
     let serverCache: Node | null = null;
     let foundAncestorDefaultView = false;
+
     // Any covering writes will necessarily be at the root, so really all we need to find is the server cache.
     // Consider optimizing this once there's a better understanding of what actual behavior will be.
-    this.syncPointTree_.foreachOnPath(path, function (pathToSyncPoint, sp) {
+    this.syncPointTree_.foreachOnPath(path, (pathToSyncPoint, syncPoint) => {
       const relativePath = Path.relativePath(pathToSyncPoint, path);
-      serverCache = serverCache || sp.getCompleteServerCache(relativePath);
-      foundAncestorDefaultView = foundAncestorDefaultView || sp.hasCompleteView();
+      serverCache = serverCache || syncPoint.getCompleteServerCache(relativePath);
+      foundAncestorDefaultView = foundAncestorDefaultView || syncPoint.hasCompleteView();
     });
+
     let syncPoint = this.syncPointTree_.get(path);
     if (!syncPoint) {
-      syncPoint = new SyncPoint();
+      syncPoint = new SyncPoint(this.persistenceManager_);
       this.syncPointTree_ = this.syncPointTree_.set(path, syncPoint);
     } else {
       foundAncestorDefaultView = foundAncestorDefaultView || syncPoint.hasCompleteView();
       serverCache = serverCache || syncPoint.getCompleteServerCache(Path.Empty);
     }
 
-    let serverCacheComplete;
-    if (serverCache != null) {
-      serverCacheComplete = true;
-    } else {
-      serverCacheComplete = false;
-      serverCache = ChildrenNode.EMPTY_NODE;
-      const subtree = this.syncPointTree_.subtree(path);
-      subtree.foreachChild(function (childName, childSyncPoint) {
-        const completeCache = childSyncPoint.getCompleteServerCache(Path.Empty);
-        if (completeCache) {
-          serverCache = serverCache.updateImmediateChild(childName, completeCache);
-        }
-      });
+    if (this.persistenceManager_ !== void 0) {
+      this.persistenceManager_.setQueryActive(query);
     }
 
+    let eventsPromise: Promise<Event[]>;
+
     const viewAlreadyExists = syncPoint.viewExistsForQuery(query);
-    if (!viewAlreadyExists && !query.getQueryParams().loadsAllData()) {
-      // We need to track a tag for this query
-      const queryKey = SyncTree.makeQueryKey_(query);
-      assert(!(queryKey in this.queryToTagMap_),
-        'View does not exist, but we have a tag');
-      const tag = SyncTree.getNextQueryTag_();
-      this.queryToTagMap_[queryKey] = tag;
-      // Coerce to string to avoid sparse arrays.
-      this.tagToQueryMap_['_' + tag] = queryKey;
+
+    if (viewAlreadyExists) {
+      eventsPromise = local.Promise.resolve(syncPoint.addEventRegistration(query, eventRegistration));
+    } else {
+      if (!query.getQueryParams().loadsAllData()) {
+        // We need to track a tag for this query
+        const queryKey = SyncTree.makeQueryKey_(query);
+        assert(!contains(this.queryToTagMap_, queryKey), 'View does not exist, but we have a tag');
+        const tag = SyncTree.getNextQueryTag_();
+        this.queryToTagMap_[queryKey] = tag;
+        // Coerce to string to avoid sparse arrays.
+        this.tagToQueryMap_['_' + tag] = query;
+      }
+
+      const writesCache = this.pendingWriteTree_.childWrites(path);
+
+      if (serverCache !== null) {
+        // We already found a complete server cache in memory
+        const events = syncPoint.addEventRegistration(query, eventRegistration,
+          writesCache, serverCache, true);
+        eventsPromise = local.Promise.resolve(events);
+      } else {
+        if (this.persistenceManager_ !== void 0) {
+          // Get the server cache from persistence
+          eventsPromise = this.persistenceManager_.getServerCache(query)
+            .then((cacheNode: CacheNode) => {
+              return syncPoint.addEventRegistration(query, eventRegistration,
+                writesCache, cacheNode.getNode(), cacheNode.isFullyInitialized());
+            })
+        } else {
+          // No complete server cache in memory and persistence disabled
+          serverCache = ChildrenNode.EMPTY_NODE as Node;
+
+          const subtree = this.syncPointTree_.subtree(path);
+          subtree.foreachChild((childName, childSyncPoint) => {
+            const completeCache = childSyncPoint.getCompleteServerCache(Path.Empty);
+            if (completeCache) {
+              serverCache = serverCache.updateImmediateChild(childName, completeCache);
+            }
+          });
+
+          const events = syncPoint.addEventRegistration(query, eventRegistration,
+            writesCache, serverCache, false);
+
+          eventsPromise = local.Promise.resolve(events);
+        }
+      }
     }
-    const writesCache = this.pendingWriteTree_.childWrites(path);
-    let events = syncPoint.addEventRegistration(query, eventRegistration, writesCache, serverCache, serverCacheComplete);
-    if (!viewAlreadyExists && !foundAncestorDefaultView) {
-      const view = /** @type !View */ (syncPoint.viewForQuery(query));
-      events = events.concat(this.setupListener_(query, view));
-    }
-    return events;
+
+    return eventsPromise.then((events: Event[]) => {
+      if (!viewAlreadyExists && !foundAncestorDefaultView) {
+        // There was no view and no default listen
+        const view = syncPoint.viewForQuery(query);
+        events = [...events, ...this.setupListener_(query, view)];
+      }
+      return events;
+    });
   }
 
   /**
@@ -352,9 +454,9 @@ export class SyncTree {
     const maybeSyncPoint = this.syncPointTree_.get(path);
     let cancelEvents: Event[] = [];
     // A removal on a default query affects all queries at that location. A removal on an indexed query, even one without
-    // other query constraints, does *not* affect all queries at that location. So this check must be for 'default', and
+    // other query constraints, does *not* affect all queries at that location. So this check must be for Query.DefaultIdentifier, and
     // not loadsAllData().
-    if (maybeSyncPoint && (query.queryIdentifier() === 'default' || maybeSyncPoint.viewExistsForQuery(query))) {
+    if (maybeSyncPoint && (query.queryIdentifier() === Query.DefaultIdentifier || maybeSyncPoint.viewExistsForQuery(query))) {
       /**
        * @type {{removed: !Array.<!Query>, events: !Array.<!Event>}}
        */
@@ -369,10 +471,15 @@ export class SyncTree {
       // properly set up.
       //
       // Since indexed queries can shadow if they don't have other query constraints, check for loadsAllData(), instead of
-      // queryId === 'default'
+      // queryId === Query.DefaultIdentifier
       const removingDefault = -1 !== removed.findIndex(function (query) {
         return query.getQueryParams().loadsAllData();
       });
+
+      if (this.persistenceManager_ !== void 0) {
+        removed.forEach((query: Query) => this.persistenceManager_.setQueryInactive(query));
+      }
+
       const covered = this.syncPointTree_.findOnPath(path, function (relativePath, parentSyncPoint) {
         return parentSyncPoint.hasCompleteView();
       });
@@ -537,7 +644,7 @@ export class SyncTree {
           let queries: Query[] = [];
           if (maybeChildSyncPoint) {
             queries = queries.concat(
-              maybeChildSyncPoint.getQueryViews().map(view=> view.getQuery())
+              maybeChildSyncPoint.getQueryViews().map(view => view.getQuery())
             );
           }
           forEach(childMap, function (key: string, childQueries: Query[]) {
@@ -597,28 +704,13 @@ export class SyncTree {
   }
 
   /**
-   * Given a queryKey (created by makeQueryKey), parse it back into a path and queryId.
-   * @private
-   * @param {!string} queryKey
-   * @return {{queryId: !string, path: !Path}}
-   */
-  private static parseQueryKey_(queryKey: string): { queryId: string, path: Path } {
-    const splitIndex = queryKey.indexOf('$');
-    assert(splitIndex !== -1 && splitIndex < queryKey.length - 1, 'Bad queryKey.');
-    return {
-      queryId: queryKey.substr(splitIndex + 1),
-      path: new Path(queryKey.substr(0, splitIndex))
-    };
-  }
-
-  /**
    * Return the query associated with the given tag, if we have one
    * @param {!number} tag
-   * @return {?string}
+   * @return {?Query}
    * @private
    */
-  private queryKeyForTag_(tag: number): string | null {
-    return this.tagToQueryMap_['_' + tag];
+  private queryForTag_(tag: number): Query | null {
+    return this.tagToQueryMap_['_' + tag] || null;
   }
 
   /**
