@@ -120,6 +120,7 @@ function compileIndvES2015ModulesToBrowser() {
       'firebase-storage': './src/storage.ts',
       'firebase-messaging': './src/messaging.ts',
       'firebase-database': './src/database.ts',
+      'firebase-database-persistence': './src/database-persistence.ts',
     },
     output: {
       filename: '[name].js',
@@ -143,6 +144,10 @@ function compileIndvES2015ModulesToBrowser() {
       new webpack.optimize.ModuleConcatenationPlugin(),
       new webpack.optimize.CommonsChunkPlugin({
         name: 'firebase-app'
+      }),
+      new webpack.optimize.CommonsChunkPlugin({
+        name: 'firebase-database',
+        chunks: ['firebase-database', 'firebase-database-persistence'],
       }),
       new WrapperPlugin({
         header: fileName => {

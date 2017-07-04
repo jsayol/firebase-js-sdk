@@ -14,13 +14,13 @@
 * limitations under the License.
 */
 
-import { FirebaseApp } from "../../app/firebase_app";
-import { safeGet } from "../../utils/obj";
-import { Repo } from "./Repo";
-import { fatal } from "./util/util";
-import { parseRepoInfo } from "./util/libs/parser";
-import { validateUrl } from "./util/validation";
-import "./Repo_transaction";
+import { FirebaseApp } from '../../app/firebase_app';
+import { safeGet } from '../../utils/obj';
+import { Repo } from './Repo';
+import { fatal } from './util/util';
+import { parseRepoInfo } from './util/libs/parser';
+import { validateUrl } from './util/validation';
+import './Repo_transaction';
 import { Database } from '../api/Database';
 import { RepoInfo } from './RepoInfo';
 
@@ -100,13 +100,15 @@ export class RepoManager {
    * @param {!Repo} repo
    */
   deleteRepo(repo: Repo) {
-    
+
     // This should never happen...
     if (safeGet(this.repos_, repo.app.name) !== repo) {
       fatal("Database " + repo.app.name + " has already been deleted.");
     }
     repo.interrupt();
-    repo.closePersistence();
+    if (typeof repo.closePersistence === 'function') {
+      repo.closePersistence();
+    }
     delete this.repos_[repo.app.name];
   }
 
