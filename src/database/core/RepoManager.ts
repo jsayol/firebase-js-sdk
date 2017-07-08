@@ -100,15 +100,16 @@ export class RepoManager {
    * @param {!Repo} repo
    */
   deleteRepo(repo: Repo) {
-
     // This should never happen...
     if (safeGet(this.repos_, repo.app.name) !== repo) {
       fatal("Database " + repo.app.name + " has already been deleted.");
     }
     repo.interrupt();
+
     if (typeof repo.closePersistence === 'function') {
       repo.closePersistence();
     }
+
     delete this.repos_[repo.app.name];
   }
 

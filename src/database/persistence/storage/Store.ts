@@ -93,8 +93,8 @@ export class Store {
     return this.storageAdapter_.writeBatch(this.database_, this.store_);
   }
 
-  pruneCheck() {
-    this.storageAdapter_.pruneCheck(this.database_, this.store_);
+  estimatedSize(): Promise<number> {
+    return this.storageAdapter_.estimatedSize(this.database_, this.store_);
   }
 }
 

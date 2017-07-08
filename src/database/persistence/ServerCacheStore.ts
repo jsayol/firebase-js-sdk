@@ -1,6 +1,6 @@
 import { assert } from '../../utils/assert';
 import { forEach } from '../../utils/obj';
-import { local } from '../../app/shared_promise';
+import { PromiseImpl } from '../../utils/promise';
 import { log, warn } from '../core/util/util';
 import { Path } from '../core/util/Path';
 import { Node } from '../core/snap/Node';
@@ -9,6 +9,7 @@ import { ChildrenNode } from '../core/snap/ChildrenNode';
 import { KEY_INDEX } from '../core/snap/indexes/KeyIndex';
 import { Store, SERVER_STORE_NAME } from './storage/Store';
 import { KeyValueItem, StorageAdapter, StorageAdapterWriteBatch } from './storage/StorageAdapter';
+import { PruneForest } from './cache/PruneForest';
 
 // Generates a server cache key based on a path
 const storeKey = (path: Path): string => {
@@ -148,7 +149,7 @@ export class ServerCacheStore {
       waitFor.push(cachePromise);
     });
 
-    return local.Promise.all(waitFor)
+    return PromiseImpl.all(waitFor)
       .then(() => {
         boundLog(`getForKeys loaded ${node.numChildren()} children path=${path}`);
         return node;
@@ -160,8 +161,43 @@ export class ServerCacheStore {
       });
   }
 
-  pruneCheck() {
-    this.store_.pruneCheck();
+  /**
+   * Prunes the server cache based on a PruneForest and a Path
+   */
+  pruneCache(pruneForest: PruneForest, path: Path): Promise<void> {
+    let pruned = 0;
+    let kept = 0;
+    const prefix = storeKey(path);
+
+    return this.store_.keys(prefix).then((keys: string[]) => {
+      const writeBatch = this.store_.writeBatch();
+
+      keys.forEach((key: string) => {
+        const relativePath = new Path(key.substring(prefix.length));
+        if (pruneForest.shouldPruneUnkeptDescendants(relativePath)) {
+          pruned += 1;
+          writeBatch.remove(key);
+        } else {
+          kept += 1;
+        }
+      });
+
+      if ((pruned === 0) && (kept === 0)) {
+        return;
+      }
+
+      return writeBatch.run()
+        .then(() => {
+          boundLog(`pruned ${pruned} paths, kept ${kept} paths path=${path}`);
+        })
+        .catch((error: Error) => {
+          boundWarn(`pruneCache failed path=${path}`, error);
+        });
+    });
+  }
+
+  estimatedSize(): Promise<number> {
+    return this.store_.estimatedSize();
   }
 
   private static removeLeafNodes_(path: Path, writeBatch: StorageAdapterWriteBatch) {

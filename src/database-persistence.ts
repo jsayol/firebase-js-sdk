@@ -9,6 +9,7 @@ import { Node } from './database/core/snap/Node';
 import { StorageAdapter } from './database/persistence/storage/StorageAdapter';
 import { PersistedUserWrite } from './database/persistence/UserWriteStore';
 import { PersistenceManager } from './database/persistence/PersistenceManager';
+import { LRUCachePolicy } from './database/persistence/cache/CachePolicy';
 
 declare module './database/core/Repo' {
   interface Repo {
@@ -27,7 +28,9 @@ Repo.prototype.enablePersistence = function (storageAdapter?: StorageAdapter | n
   }
 
   try {
-    this.persistenceManager_ = new PersistenceManager(this, storageAdapter);
+    const maxCacheSize = storageAdapter.maxServerCacheSize || void 0;
+    const cachePolicy = new LRUCachePolicy(maxCacheSize);
+    this.persistenceManager_ = new PersistenceManager(this, cachePolicy, storageAdapter);
   } catch (error) {
     // Something went wrong when initializing persistence. It's possible that the platform
     // where we're running doesn't support the storage adapter we're trying to use.

@@ -13,11 +13,19 @@ export interface StorageAdapter {
    * Indicates how often at most to execute a write operation for any particular path.
    * If it's 0 or an otherwise falsey value then no throttling is performed.
    *
-   * Note(jsayol): throttling is not implemented yet.
+   * TODO(jsayol): throttling is not implemented yet.
    *
    * @type {number=} Time in miliseconds
    */
-  writeThrottleTime?: number;
+  readonly writeThrottleTime?: number | null;
+
+  /**
+   * The maximum size in bytes for the server cache.
+   * If it's undefined or otherwise falsy then the default value will be used.
+   *
+   * @type {number=} Size in bytes
+   */
+  readonly maxServerCacheSize?: number | null;
 
   /**
    * Retrieves from storage the value associated with a given key
@@ -120,13 +128,12 @@ export interface StorageAdapter {
   writeBatch(database: string, store: string): StorageAdapterWriteBatch;
 
   /**
-   * Signals the storage adapter to do any necessary pruning to keep the size
-   * of the database under its own set limits.
+   * Returns a Promise that resolves with the estimated size in bytes of the store.
    *
    * @param {!string} database The name of the database to use
    * @param {!string} store The name of the store to use
    */
-  pruneCheck(database: string, store: string);
+  estimatedSize(database: string, store: string): Promise<number>;
 }
 
 /**
@@ -178,17 +185,18 @@ export interface StorageAdapterWriteBatch {
 export const validateStorageAdapter = (apiName: string, storageAdapter: StorageAdapter): boolean => {
   const isValid = (typeof storageAdapter === 'object')
     && (('get' in storageAdapter) && (typeof storageAdapter.get === 'function'))
-    && (('getAll' in storageAdapter) && (typeof storageAdapter.get === 'function'))
+    && (('getAll' in storageAdapter) && (typeof storageAdapter.getAll === 'function'))
     && (('set' in storageAdapter) && (typeof storageAdapter.set === 'function'))
     && (('remove' in storageAdapter) && (typeof storageAdapter.remove === 'function'))
-    && (('removePrefixed' in storageAdapter) && (typeof storageAdapter.remove === 'function'))
+    && (('removePrefixed' in storageAdapter) && (typeof storageAdapter.removePrefixed === 'function'))
     && (('clear' in storageAdapter) && (typeof storageAdapter.clear === 'function'))
     && (('keys' in storageAdapter) && (typeof storageAdapter.keys === 'function'))
     && (('count' in storageAdapter) && (typeof storageAdapter.count === 'function'))
-    && (('close' in storageAdapter) && (typeof storageAdapter.count === 'function'))
-    && (('writeBatch' in storageAdapter) && (typeof storageAdapter.count === 'function'))
-    && (('pruneCheck' in storageAdapter) && (typeof storageAdapter.count === 'function'))
-    && (!storageAdapter.writeThrottleTime || (typeof storageAdapter.writeThrottleTime === 'number'));
+    && (('close' in storageAdapter) && (typeof storageAdapter.close === 'function'))
+    && (('writeBatch' in storageAdapter) && (typeof storageAdapter.writeBatch === 'function'))
+    && (('estimatedSize' in storageAdapter) && (typeof storageAdapter.estimatedSize === 'function'))
+    && (!storageAdapter.writeThrottleTime || (typeof storageAdapter.writeThrottleTime === 'number'))
+    && (!storageAdapter.maxServerCacheSize || (typeof storageAdapter.maxServerCacheSize === 'number'));
 
   if (!isValid) {
     throw new Error(`${apiName} failed: The provided storage adapter implementation is not valid.`);

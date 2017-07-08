@@ -1,11 +1,13 @@
 import { Query } from '../../api/Query';
 import { Path } from '../../core/util/Path';
-import { ImmutableTree } from '../../core/util/ImmutableTree';
-import { TrackedQuery } from './TrackedQuery';
-import { assert } from '../../../utils/assert';
 import { log, warn } from '../../core/util/util';
+import { ImmutableTree } from '../../core/util/ImmutableTree';
+import { assert } from '../../../utils/assert';
 import { forEach } from '../../../utils/obj';
-import { local } from '../../../app/shared_promise';
+import { PromiseImpl } from '../../../utils/promise';
+import { CachePolicy } from '../cache/CachePolicy';
+import { PruneForest } from '../cache/PruneForest';
+import { TrackedQuery } from './TrackedQuery';
 import { TrackedQueryStore } from './TrackedQueryStore';
 
 interface TrackedQueryMap {
@@ -18,6 +20,14 @@ const normalizeQuery = (query: Query) => {
     : query;
 };
 
+const numQueriesToPrune = (cachePolicy: CachePolicy, numPrunable: number): number => {
+  const numPercent = Math.ceil(numPrunable * cachePolicy.percentQueriesPruneAtOnce());
+  const maxToKeep = cachePolicy.maxPrunableQueriesToKeep();
+  const numMax = (numPrunable > maxToKeep) ? numPrunable - maxToKeep : 0;
+
+  return Math.max(numMax, numPercent);
+};
+
 const boundLog = log.bind(null, 'TrackedQueryManager:') as (...args: any[]) => void;
 
 export class TrackedQueryManager {
@@ -26,10 +36,13 @@ export class TrackedQueryManager {
 
   constructor(private trackedQueryStore_: TrackedQueryStore) {
     this.trackedQueryStore_.load().then((trackedQueries: TrackedQuery[]) => {
+      const lastUse = Date.now();
+
       trackedQueries.forEach((trackedQuery: TrackedQuery) => {
         this.nextId = Math.max(trackedQuery.id + 1, this.nextId);
         if (trackedQuery.active) {
           trackedQuery.active = false;
+          trackedQuery.lastUse = lastUse;
           boundLog(`inactivating query ${trackedQuery.id} from previous app start`);
           this.trackedQueryStore_.save(trackedQuery);
         }
@@ -50,7 +63,7 @@ export class TrackedQueryManager {
     const trackedQuery = this.find(query);
     assert(trackedQuery, 'Tracked query must exist to be removed');
 
-    this.trackedQueryStore_.removeKeys(trackedQuery.id);
+    this.trackedQueryStore_.removeKeys([trackedQuery.id]);
     const trackedQueryMap = this.trackedQueryTree_.get(query.path);
     delete trackedQueryMap[query.queryIdentifier()];
   }
@@ -66,12 +79,14 @@ export class TrackedQueryManager {
   private setActiveState_(query: Query, active: boolean) {
     query = normalizeQuery(query);
     let trackedQuery = this.find(query);
+    const lastUse = Date.now();
 
     if (trackedQuery) {
       trackedQuery.active = active;
+      trackedQuery.lastUse = lastUse;
     } else {
       assert(active, 'If we\'re setting the query to inactive, we should already be tracking it');
-      trackedQuery = new TrackedQuery(this.nextId++, query, active);
+      trackedQuery = new TrackedQuery(this.nextId++, query, lastUse, active);
       this.cacheTrackedQuery_(trackedQuery);
     }
 
@@ -126,7 +141,7 @@ export class TrackedQueryManager {
       let trackedQuery = this.find(query);
 
       if (!trackedQuery) {
-        trackedQuery = new TrackedQuery(this.nextId++, query, false, true);
+        trackedQuery = new TrackedQuery(this.nextId++, query, Date.now(), false, true);
         this.cacheTrackedQuery_(trackedQuery);
       } else {
         assert(!trackedQuery.complete, 'The tracked query was already marked as complete');
@@ -173,7 +188,7 @@ export class TrackedQueryManager {
         }
       });
 
-    return local.Promise.all(waitFor)
+    return PromiseImpl.all(waitFor)
       .then(() => [...completeChildren, ...completeBelow])
       .then((keys: string[]) => {
         boundLog(`knownCompleteChildren path=${path} keys =`, keys);
@@ -215,6 +230,88 @@ export class TrackedQueryManager {
     trackedQueryMap[query.queryIdentifier()] = trackedQuery;
   }
 
+  pruneOld(cachePolicy: CachePolicy): PruneForest {
+    const prunableQueries: TrackedQuery[] = [];
+    const unprunableQueries: TrackedQuery[] = [];
+
+    this.trackedQueryTree_.foreach((path: Path, map: TrackedQueryMap) => {
+      forEach(map, (key: string, trackedQuery: TrackedQuery) => {
+        if (trackedQuery.active) {
+          prunableQueries.push(trackedQuery);
+        } else {
+          unprunableQueries.push(trackedQuery);
+        }
+      });
+    });
+
+    prunableQueries.sort(TrackedQuery.lastUseComparator);
+
+    let pruneForest = PruneForest.Empty;
+    const numToPrune = numQueriesToPrune(cachePolicy, prunableQueries.length);
+    const trackedQueriesToRemove: Query[] = [];
+
+    for (let i = 0; i < numToPrune; i++) {
+      const toPrune = prunableQueries[i];
+      pruneForest = pruneForest.prunePath(toPrune.query.path);
+      this.remove(toPrune.query);
+      trackedQueriesToRemove.push(toPrune.query)
+    }
+
+    if (trackedQueriesToRemove.length > 0) {
+      this.removeBatch_(trackedQueriesToRemove);
+    }
+
+    // Keep the rest of the prunable queries
+    for (let i = numToPrune; i < prunableQueries.length; i++) {
+      const toKeep = prunableQueries[i];
+      pruneForest = pruneForest.keepPath(toKeep.query.path);
+    }
+
+    // Also keep unprunable queries
+    unprunableQueries.forEach((toKeep: TrackedQuery) => {
+      pruneForest = pruneForest.keepPath(toKeep.query.path);
+    });
+
+    return pruneForest;
+  }
+
+  numPrunableQueries(): number {
+    let num = 0;
+
+    this.trackedQueryTree_.foreach((path: Path, map: TrackedQueryMap) => {
+      forEach(map, (key: string, trackedQuery: TrackedQuery) => {
+        if (!trackedQuery.active) {
+          num += 1;
+        }
+      })
+    });
+
+    return num;
+  }
+
+  private removeBatch_(queries: Query[]) {
+    const ids: number[] = [];
+
+    queries.forEach((query: Query) => {
+      query = normalizeQuery(query);
+      const trackedQuery = this.find(query);
+
+      if (!trackedQuery) {
+        warn('Tracked query must exist to be removed');
+        return;
+      }
+
+      const trackedQueryMap = this.trackedQueryTree_.get(query.path);
+      delete trackedQueryMap[query.queryIdentifier()];
+      ids.push(trackedQuery.id);
+    });
+
+    if (ids.length > 0) {
+      this.trackedQueryStore_.removeKeys(ids);
+    }
+  }
+
+  /*
   // For testing. Not used yet.
   verifyCache() {
     this.trackedQueryStore_.load()
@@ -238,5 +335,5 @@ export class TrackedQueryManager {
         assert(cacheOK, 'Tracked queries and persisted queries on storage don\'t match');
       });
   }
-
+  */
 }

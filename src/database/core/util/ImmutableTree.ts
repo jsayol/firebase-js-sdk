@@ -256,7 +256,7 @@ export class ImmutableTree<T> {
    * @private
    */
   private fold_<V>(pathSoFar: Path, fn: (path: Path, value: T | null, children: { [k: string]: V }) => V): V {
-    const accum: {[k: string]: V} = {};
+    const accum: { [k: string]: V } = {};
     this.children.inorderTraversal(function (childKey: string, childTree: ImmutableTree<T>) {
       accum[childKey] = childTree.fold_(pathSoFar.child(childKey), fn);
     });
@@ -367,5 +367,45 @@ export class ImmutableTree<T> {
 
     return this.children.inorderTraversal(
       (name: string, child: ImmutableTree<T>) => child.containsValueMatching(fn));
+  }
+
+  /**
+   * Finds the leaf-most node in the tree for a given path, or null if there's none
+   *
+   * @param path
+   * @return {?Object} The value for the node, or null
+   */
+  findLeafMostValue(path: Path): T | null {
+    return this.findLeafMostMatchingValue(path, () => true);
+  }
+
+  /**
+   * Given a path and a predicate, returns the leaf-most node
+   * where the predicate returns true.
+   *
+   * @param relativePath
+   * @param fn
+   */
+  findLeafMostMatchingValue(relativePath: Path,
+                            fn: (value: T) => boolean): T | null {
+    const pathParts = relativePath.slice();
+    let currentTree = this as ImmutableTree<T>;
+    let currentValue = this.value;
+
+    for (let i = 0; i < pathParts.length; i++) {
+      const key = pathParts[i];
+      currentTree = currentTree.children.get(key);
+
+      if (currentTree === null) {
+        break;
+      } else {
+        const value = currentTree.value;
+        if ((value !== null) && fn(value)) {
+          currentValue = value;
+        }
+      }
+    }
+
+    return currentValue;
   }
 }

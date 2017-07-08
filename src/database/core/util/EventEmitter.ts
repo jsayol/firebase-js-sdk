@@ -15,7 +15,6 @@
 */
 
 import { assert } from '../../../utils/assert';
-import { contains } from '../../../utils/obj';
 
 /**
  * Base class to be used if you want to emit events. Call the constructor with

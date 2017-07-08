@@ -14,9 +14,9 @@
 * limitations under the License.
 */
 
-import { globalScope } from '../utils/globalScope';
+import { globalScope } from './globalScope';
 
-export const PromiseImpl = globalScope.Promise || require('promise-polyfill');
+export const PromiseImpl: typeof Promise = globalScope.Promise || require('promise-polyfill');
 
 /**
  * A deferred promise implementation.

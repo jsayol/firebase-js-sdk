@@ -1,7 +1,8 @@
-import { StorageAdapter, StorageAdapterWriteBatch } from './StorageAdapter';
+import { KeyValueItem, StorageAdapter, StorageAdapterWriteBatch } from './StorageAdapter';
 import { QUERIES_STORE_NAME, SERVER_STORE_NAME, USER_STORE_NAME, VALID_STORES } from './Store';
+import { assert, assertionError } from '../../../utils/assert';
 import { contains, every } from '../../../utils/obj';
-import { assert } from '../../../utils/assert';
+import { stringLength } from '../../../utils/utf8';
 
 /**
  * WARNING: If this version number is changed, make sure to include the necessary migration script
@@ -32,7 +33,10 @@ let idbFactoryImpl: IDBFactory;
  */
 export class IDBStorageAdapter implements StorageAdapter {
   /** @inheritDoc */
-  writeThrottleTime = 1000;
+  readonly writeThrottleTime = 1000;
+
+  /** @inheritDoc */
+  readonly maxServerCacheSize = 25*1024*1024;
 
   /**
    * An object of promises that resolve with the database object
@@ -61,8 +65,8 @@ export class IDBStorageAdapter implements StorageAdapter {
   }
 
   /** @inheritDoc */
-  getAll(dbName: string, storeName: string, prefix?: string): Promise<{ key: string, value: any }[]> {
-    const pairs: { key: string, value: any }[] = [];
+  getAll(dbName: string, storeName: string, prefix?: string): Promise<KeyValueItem<any>[]> {
+    const pairs: KeyValueItem<any>[] = [];
 
     // If we're using a prefix then build the corresponding IDBKeyRange
     const keyRange = generatePrefixKeyRange(prefix);
@@ -77,7 +81,7 @@ export class IDBStorageAdapter implements StorageAdapter {
         }
 
         pairs.push({
-          key: <string>cursor.key,
+          key: cursor.key as string,
           value: cursor.value
         });
 
@@ -174,9 +178,48 @@ export class IDBStorageAdapter implements StorageAdapter {
   }
 
   /** @inheritDoc */
-  pruneCheck(dbName: string, storeName: string) {
-    // Each browser's IndexedDB implementation handles its own quotas
-    // and any necessary pruning. No need to do anything here.
+  estimatedSize(dbName: string, storeName: string): Promise<number> {
+    return this.getAll(dbName, storeName).then((items: KeyValueItem<any>[]) => {
+      let size = 0;
+
+      items.forEach((item: KeyValueItem<any>) => {
+        size += this.estimatedSize_(item.key, item.value);
+      });
+
+      return size;
+    });
+  }
+
+  private estimatedSize_(key: string, value: any): number {
+    /*
+    If it's a number, count a fixed weight for it. Like 4 bytes, for example.
+    If it's a string, count its length in bytes (taking encodings like UTF-8 into account)
+    If it's a boolean, count only a small weight. Maybe half a byte (1/8th seems too optimistic, in general)
+    If it's an array, loop its elements and apply the same algorithm recursively.
+    (Also, for each entry we'd add the length of the key to the count)
+     */
+    const valueType = typeof value;
+    let keySize = stringLength(key);
+
+    if (valueType === 'number') {
+      return keySize + 4;
+    }
+
+    if (valueType === 'string') {
+      return keySize + stringLength(value);
+    }
+
+    if (valueType === 'boolean') {
+      return keySize + 0.5;
+    }
+
+    if ((valueType === 'object') && Array.isArray(value)) {
+      return keySize + (value as Array<any>)
+        .map((arrItem: any) => this.estimatedSize_('', arrItem))
+        .reduce((prev: number, sum: number) => sum + prev, 0);
+    }
+
+    throw assertionError(`IDBStorageAdapter cannot estimate the size for '${valueType}'`);
   }
 
   /**

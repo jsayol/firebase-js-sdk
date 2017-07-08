@@ -1,5 +1,6 @@
 import { assert } from '../../utils/assert';
 import { forEach } from '../../utils/obj';
+import { PromiseImpl } from '../../utils/promise';
 import { Repo } from '../core/Repo';
 import { log, warn } from '../core/util/util';
 import { Path } from '../core/util/Path';
@@ -12,14 +13,8 @@ import { ServerCacheStore } from './ServerCacheStore';
 import { PersistedUserWrite, UserWriteStore } from './UserWriteStore';
 import { TrackedQueryStore } from './query/TrackedQueryStore';
 import { IDBStorageAdapter } from './storage/IDBStorageAdapter';
-import { local } from '../../app/shared_promise';
 import { ChildrenNode } from '../core/snap/ChildrenNode';
-
-/*
- * How often, in number of server updates, to signal the server cache store
- * to do a prune check.
- */
-const SERVER_UPDATES_BETWEEN_PRUNE_CHECKS = 1000;
+import { CachePolicy } from './cache/CachePolicy';
 
 // Prefix for the database name to use
 const DATABASE_PREFIX = 'firebase:';
@@ -38,7 +33,8 @@ export class PersistenceManager {
   private userWriteStore_: UserWriteStore;
   private trackedQueryStore_: TrackedQueryStore;
 
-  constructor(repo: Repo, storageAdapter?: StorageAdapter | null) {
+  constructor(repo: Repo, private cachePolicy_: CachePolicy,
+              storageAdapter?: StorageAdapter | null) {
     const database = DATABASE_PREFIX + repo.app.options.apiKey;
 
     if (!storageAdapter) {
@@ -55,7 +51,7 @@ export class PersistenceManager {
    * Close this persistence manager. It won't be used anymore.
    */
   close(): Promise<any> {
-    return local.Promise.all([
+    return PromiseImpl.all([
       this.serverCacheStore_.close(),
       this.userWriteStore_.close(),
       this.trackedQueryStore_.close()
@@ -97,9 +93,12 @@ export class PersistenceManager {
     }
   }
 
+  /*
+  // For tests. Not used yet.
   clearUserWrites() {
     this.userWriteStore_.clear();
   }
+  */
 
   /* ======= [END] USER WRITES ======= */
 
@@ -158,11 +157,32 @@ export class PersistenceManager {
 
   private pruneCheck_() {
     this.serverUpdatesSincePruneCheck_ += 1;
-    if (this.serverUpdatesSincePruneCheck_ > SERVER_UPDATES_BETWEEN_PRUNE_CHECKS) {
-      boundLog(`pruneCheck after ${this.serverUpdatesSincePruneCheck_} updates`);
-      this.serverCacheStore_.pruneCheck();
+
+    if (this.cachePolicy_.shouldCheckSize(this.serverUpdatesSincePruneCheck_)) {
+      boundLog(`reached prune check threshold after ${this.serverUpdatesSincePruneCheck_} updates. Checking...`);
       this.serverUpdatesSincePruneCheck_ = 0;
+      this.recursivePruneCheck_()
+        .then(() => {
+          boundLog(`finished pruning server cache`);
+        })
+        .catch((error: Error) => {
+          boundWarn(`pruning server cache failed`, error);
+        });
     }
+  }
+
+  private recursivePruneCheck_(isAfterPruning = false): Promise<void> {
+    return this.serverCacheStore_.estimatedSize().then((cacheSize: number) => {
+      boundLog(`cache size${isAfterPruning ? ' after pruning' : ''}: ${cacheSize}`);
+
+      if (this.cachePolicy_.shouldPrune(cacheSize, this.trackedQueryManager_.numPrunableQueries())) {
+        const pruneForest = this.trackedQueryManager_.pruneOld(this.cachePolicy_);
+        if (pruneForest.prunesAnything()) {
+          return this.serverCacheStore_.pruneCache(pruneForest, Path.Empty)
+            .then(() => this.recursivePruneCheck_(true));
+        }
+      }
+    });
   }
 
   /* ======= [END] SERVER CACHE ======= */

@@ -158,24 +158,24 @@ export class TrackedQueryStore {
       });
   }
 
-  removeKeys(id: number) {
-    const writeBatch = this.store_.writeBatch();
-    let numKeys;
+  removeKeys(ids: number[]) {
+    ids.forEach((id: number) => {
+      const writeBatch = this.store_.writeBatch();
 
-    writeBatch.remove(storeQueryPrefix(id));
+      writeBatch.remove(storeQueryPrefix(id));
 
-    this.store_.keys(storeQueryKeyPrefix(id))
-      .then((keys: string[]) => {
-        numKeys = keys.length;
-        writeBatch.remove(keys);
-        return writeBatch.run();
-      })
-      .then(() => {
-        boundLog(`removed tracked query id=${id} and ${numKeys} tracked keys`);
-      })
-      .catch((error: Error) => {
-        boundWarn(`removeKeys failed id=${id}`, error);
-      });
+      this.store_.keys(storeQueryKeyPrefix(id))
+        .then((keys: string[]) => {
+          writeBatch.remove(keys);
+          return writeBatch.run().then(() => keys.length);
+        })
+        .then((numKeys: number) => {
+          boundLog(`removed tracked query id=${id} and ${numKeys} tracked keys`);
+        })
+        .catch((error: Error) => {
+          boundWarn(`removeKeys failed id=${id}`, error);
+        });
+    });
   }
 
 }

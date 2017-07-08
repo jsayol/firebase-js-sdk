@@ -35,8 +35,8 @@ import { View } from './view/View';
 import { PersistenceManager } from '../persistence/PersistenceManager';
 import { Repo } from './Repo';
 import { resolveDeferredValueSnapshot } from './util/ServerValues';
-import { local } from '../../app/shared_promise';
 import { CacheNode } from './view/CacheNode';
+import { PromiseImpl } from '../../utils/promise';
 
 /**
  * @typedef {{
@@ -163,9 +163,9 @@ export class SyncTree {
    * Acknowledge a pending user write that was previously registered with applyUserOverwrite() or applyUserMerge().
    *
    * @param {!number} writeId
-   * @param {boolean} persist True if the user write involves persistence
-   * @param {Repo=} repo
    * @param {boolean=} revert True if the given write failed and needs to be reverted
+   * @param {boolean=} persist True if the user write involves persistence
+   * @param {Repo=} repo
    * @return {!Array.<!Event>} Events to raise.
    */
   ackUserWrite(writeId: number, revert = false, persist = false, repo?: Repo): Event[] {
@@ -379,7 +379,7 @@ export class SyncTree {
     const viewAlreadyExists = syncPoint.viewExistsForQuery(query);
 
     if (viewAlreadyExists) {
-      eventsPromise = local.Promise.resolve(syncPoint.addEventRegistration(query, eventRegistration));
+      eventsPromise = PromiseImpl.resolve(syncPoint.addEventRegistration(query, eventRegistration));
     } else {
       if (!query.getQueryParams().loadsAllData()) {
         // We need to track a tag for this query
@@ -397,7 +397,7 @@ export class SyncTree {
         // We already found a complete server cache in memory
         const events = syncPoint.addEventRegistration(query, eventRegistration,
           writesCache, serverCache, true);
-        eventsPromise = local.Promise.resolve(events);
+        eventsPromise = PromiseImpl.resolve(events);
       } else {
         if (this.persistenceManager_ !== void 0) {
           // Get the server cache from persistence
@@ -421,7 +421,7 @@ export class SyncTree {
           const events = syncPoint.addEventRegistration(query, eventRegistration,
             writesCache, serverCache, false);
 
-          eventsPromise = local.Promise.resolve(events);
+          eventsPromise = PromiseImpl.resolve(events);
         }
       }
     }

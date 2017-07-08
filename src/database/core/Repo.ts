@@ -55,7 +55,6 @@ export class Repo {
 
   private infoSyncTree_: SyncTree;
   private serverSyncTree_: SyncTree;
-
   private stats_: StatsCollection;
   private statsListener_: StatsListener | null = null;
   private eventQueue_ = new EventQueue();
@@ -71,7 +70,6 @@ export class Repo {
 
   // A list of data pieces and paths to be set when this client disconnects.
   private onDisconnect_ = new SparseSnapshotTree();
-
 
   /**
    * TODO: This should be @private but it's used by test_access.js and internal.js
@@ -350,7 +348,7 @@ export class Repo {
     const changedChildren: { [k: string]: Node } = {};
     forEach(childrenToMerge, (changedKey: string, changedValue: any) => {
       empty = false;
-      let newNodeUnresolved = nodeFromJSON(changedValue);
+      const newNodeUnresolved = nodeFromJSON(changedValue);
       changedChildren[changedKey] = resolveDeferredValueSnapshot(newNodeUnresolved, serverValues);
     });
 

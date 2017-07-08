@@ -84,21 +84,21 @@ export class SyncPoint {
    *
    * @param {!Operation} operation
    * @param {!WriteTreeRef} writesCache
-   * @param {?Node} optCompleteServerCache
+   * @param {?Node} completeServerCache
    * @return {!Array.<!Event>}
    */
   applyOperation(operation: Operation, writesCache: WriteTreeRef,
-                 optCompleteServerCache: Node | null): Event[] {
+                 completeServerCache: Node | null): Event[] {
     const queryId = operation.source.queryId;
     if (queryId !== null) {
       const view = safeGet(this.views_, queryId);
       assert(view != null, 'SyncTree gave us an op for an invalid query.');
-      return this.applyOperationToView_(view, operation, writesCache, optCompleteServerCache);
+      return this.applyOperationToView_(view, operation, writesCache, completeServerCache);
     } else {
       let events: Event[] = [];
 
       forEach(this.views_, (key: string, view: View) => {
-        events = events.concat(this.applyOperationToView_(view, operation, writesCache, optCompleteServerCache));
+        events = events.concat(this.applyOperationToView_(view, operation, writesCache, completeServerCache));
       });
 
       return events;
@@ -106,12 +106,12 @@ export class SyncPoint {
   }
 
   private applyOperationToView_(view: View, operation: Operation, writesCache: WriteTreeRef,
-                                optCompleteServerCache: Node | null): Event[] {
+                                completeServerCache: Node | null): Event[] {
 
-    const applied = view.applyOperation(operation, writesCache, optCompleteServerCache);
-    const query = view.getQuery();
+    const applied = view.applyOperation(operation, writesCache, completeServerCache);
 
     if (this.persistenceManager_ !== void 0) {
+      const query = view.getQuery();
       if (!query.getQueryParams().loadsAllData()) {
         const removedKeys: string[] = [];
         const addedKeys: string[] = [];
@@ -138,7 +138,7 @@ export class SyncPoint {
    *
    * @param {!Query} query
    * @param {!EventRegistration} eventRegistration
-   * @param {WriteTreeRef?} writesCache
+   * @param {WriteTreeRef=} writesCache
    * @param {?Node=} serverCache Complete server cache, if we have it.
    * @param {boolean=} serverCacheComplete
    * @return {!Array.<!Event>} Events to raise.
@@ -162,8 +162,8 @@ export class SyncPoint {
         eventCacheComplete = false;
       }
       const viewCache = new ViewCache(
-        new CacheNode(/** @type {!Node} */ (eventCache), eventCacheComplete, false),
-        new CacheNode(/** @type {!Node} */ (serverCache), serverCacheComplete, false)
+        new CacheNode(eventCache, eventCacheComplete, false),
+        new CacheNode(serverCache, serverCacheComplete, false)
       );
       view = new View(query, viewCache);
       this.views_[query.queryIdentifier()] = view;

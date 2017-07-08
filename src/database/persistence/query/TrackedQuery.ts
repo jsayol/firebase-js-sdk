@@ -4,6 +4,7 @@ import { Repo } from '../../core/Repo';
 export interface TrackedQueryJSON {
   id: number;
   query: QueryJSON;
+  lastUse: number;
   active: boolean;
   complete: boolean;
 }
@@ -18,14 +19,26 @@ export class TrackedQuery {
   static fromJSON(json: TrackedQueryJSON, repo?: Repo): TrackedQuery | null {
     try {
       const query = Query.fromJSON(json.query, repo);
-      const trackedQuery = new TrackedQuery(json.id, query, json.active);
-      trackedQuery.complete_ = json.complete;
+      const trackedQuery = new TrackedQuery(json.id, query, json.lastUse, json.active);
+      trackedQuery.complete = json.complete;
       return trackedQuery;
     } catch (err) {
       return null;
     }
   }
 
+  static lastUseComparator(query1: TrackedQuery, query2: TrackedQuery) {
+    if (query1.lastUse < query2.lastUse) {
+      return -1;
+    } else if (query1.lastUse > query2.lastUse) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
+  /*
+  // for tests. Not used yet.
   static queryIdComparator(query1: TrackedQuery, query2: TrackedQuery) {
     if (query1.id < query2.id) {
       return -1;
@@ -35,19 +48,22 @@ export class TrackedQuery {
       return 0;
     }
   }
+  */
 
   constructor(public readonly id: number,
               public readonly query: Query,
-              private active_: boolean,
-              private complete_ = false) {
+              public lastUse: number,
+              public active: boolean,
+              public complete = false) {
   }
 
   toJSON(): TrackedQueryJSON {
     return {
       id: this.id,
       query: this.query.toJSONObject(),
-      active: this.active_,
-      complete: this.complete_
+      lastUse: this.lastUse,
+      active: this.active,
+      complete: this.complete
     };
   }
 
@@ -58,24 +74,9 @@ export class TrackedQuery {
 
     return (this.id === other.id)
       && (this.query.isEqual(other.query))
-      && (this.active_ === other.active_)
-      && (this.complete_ === other.complete_);
-  }
-
-  get active() {
-    return this.active_;
-  }
-
-  set active(value: boolean) {
-    this.active_ = value;
-  }
-
-  get complete() {
-    return this.complete_;
-  }
-
-  set complete(value: boolean) {
-    this.complete_ = value;
+      && (this.lastUse === other.lastUse)
+      && (this.active === other.active)
+      && (this.complete === other.complete);
   }
 
 }
