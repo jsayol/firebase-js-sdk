@@ -157,12 +157,15 @@ export class TrackedQueryManager {
       (map: TrackedQueryMap) => {
         const trackedQuery = map[Query.DefaultIdentifier];
         return trackedQuery && trackedQuery.complete;
-      })
+      });
   }
 
   hasActiveDefault(path: Path): boolean {
     return !!this.trackedQueryTree_.findRootMostMatchingPathAndValue(path,
-      (map: TrackedQueryMap) => map[Query.DefaultIdentifier].active);
+      (map: TrackedQueryMap) => {
+        const trackedQuery = map[Query.DefaultIdentifier];
+        return trackedQuery && trackedQuery.active;
+      });
   }
 
   knownCompleteChildren(path: Path): Promise<string[]> {

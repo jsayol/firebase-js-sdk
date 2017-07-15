@@ -12,7 +12,6 @@ import { TrackedQueryManager } from './query/TrackedQueryManager';
 import { ServerCacheStore } from './ServerCacheStore';
 import { PersistedUserWrite, UserWriteStore } from './UserWriteStore';
 import { TrackedQueryStore } from './query/TrackedQueryStore';
-import { IDBStorageAdapter } from './storage/IDBStorageAdapter';
 import { ChildrenNode } from '../core/snap/ChildrenNode';
 import { CachePolicy } from './cache/CachePolicy';
 
@@ -34,12 +33,8 @@ export class PersistenceManager {
   private trackedQueryStore_: TrackedQueryStore;
 
   constructor(repo: Repo, private cachePolicy_: CachePolicy,
-              storageAdapter?: StorageAdapter | null) {
+              storageAdapter: StorageAdapter | null) {
     const database = DATABASE_PREFIX + repo.app.options.apiKey;
-
-    if (!storageAdapter) {
-      storageAdapter = new IDBStorageAdapter();
-    }
 
     this.serverCacheStore_ = new ServerCacheStore(database, storageAdapter);
     this.userWriteStore_ = new UserWriteStore(database, storageAdapter);

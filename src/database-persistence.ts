@@ -7,6 +7,7 @@ import { resolveDeferredValueSnapshot } from './database/core/util/ServerValues'
 import { nodeFromJSON } from './database/core/snap/nodeFromJSON';
 import { Node } from './database/core/snap/Node';
 import { StorageAdapter } from './database/persistence/storage/StorageAdapter';
+import { IDBStorageAdapter } from './database/persistence/storage/IDBStorageAdapter';
 import { PersistedUserWrite } from './database/persistence/UserWriteStore';
 import { PersistenceManager } from './database/persistence/PersistenceManager';
 import { LRUCachePolicy } from './database/persistence/cache/CachePolicy';
@@ -28,6 +29,10 @@ Repo.prototype.enablePersistence = function (storageAdapter?: StorageAdapter | n
   }
 
   try {
+    if (!storageAdapter) {
+      storageAdapter = new IDBStorageAdapter();
+    }
+
     const maxCacheSize = storageAdapter.maxServerCacheSize || void 0;
     const cachePolicy = new LRUCachePolicy(maxCacheSize);
     this.persistenceManager_ = new PersistenceManager(this, cachePolicy, storageAdapter);
