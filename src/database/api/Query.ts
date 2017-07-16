@@ -474,14 +474,14 @@ export class Query {
 
   toJSONObject(): QueryJSON {
     return {
-      path: this.path.toString(),
-      params: this.queryParams_.toJSON()
+      'path': this.path.toString(),
+      'params': this.queryParams_.toJSON()
     };
   }
 
   static fromJSON(json: QueryJSON, repo?: Repo): Query {
-    const path = new Path(json.path);
-    const queryParams = QueryParams.fromJSON(json.params);
+    const path = new Path(json['path']);
+    const queryParams = QueryParams.fromJSON(json['params']);
     return new Query(repo, path, queryParams, false);
   }
 

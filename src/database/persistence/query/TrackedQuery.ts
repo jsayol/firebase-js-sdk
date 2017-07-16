@@ -18,9 +18,9 @@ export class TrackedQuery {
    */
   static fromJSON(json: TrackedQueryJSON, repo?: Repo): TrackedQuery | null {
     try {
-      const query = Query.fromJSON(json.query, repo);
-      const trackedQuery = new TrackedQuery(json.id, query, json.lastUse, json.active);
-      trackedQuery.complete = json.complete;
+      const query = Query.fromJSON(json['query'], repo);
+      const trackedQuery = new TrackedQuery(json['id'], query, json['lastUse'], json['active']);
+      trackedQuery.complete = json['complete'];
       return trackedQuery;
     } catch (err) {
       return null;
@@ -59,11 +59,11 @@ export class TrackedQuery {
 
   toJSON(): TrackedQueryJSON {
     return {
-      id: this.id,
-      query: this.query.toJSONObject(),
-      lastUse: this.lastUse,
-      active: this.active,
-      complete: this.complete
+      'id': this.id,
+      'query': this.query.toJSONObject(),
+      'lastUse': this.lastUse,
+      'active': this.active,
+      'complete': this.complete
     };
   }
 

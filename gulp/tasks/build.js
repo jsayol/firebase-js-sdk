@@ -185,8 +185,8 @@ function compileIndvES2015ModulesToBrowser() {
             },
           },
           compress: {
-            // passes: 3,
-            // unsafe: true,
+            passes: 3,
+            unsafe: true,
             warnings: false,
           }
         }
@@ -198,7 +198,7 @@ function compileIndvES2015ModulesToBrowser() {
   };
 
   return gulp.src('src/**/*.ts')
-    .pipe(webpackStream(webpackConfig, webpack, () => console.log(nameCache)))
+    .pipe(webpackStream(webpackConfig, webpack))
     .pipe(gulp.dest(`${config.paths.outDir}/browser`));
 }
 

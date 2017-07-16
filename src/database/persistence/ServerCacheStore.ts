@@ -109,7 +109,6 @@ export class ServerCacheStore {
 
             items.forEach((item: KeyValueItem<any>) => {
               let child = data;
-              console.log('*#*#*#*#*#*#*# !!!!!!! -> getAtPath', item.key, baseKey);
               const subpath = item.key.substring(baseKey.length)
                 .split('/').filter(part => part.length > 0);
 

@@ -434,18 +434,18 @@ export class QueryParams {
    */
   toJSON(): QueryParamsJSON {
     return {
-      limitSet_: this.limitSet_,
-      limit_: this.limit_,
-      startSet_: this.startSet_,
-      indexStartValue_: this.indexStartValue_,
-      startNameSet_: this.startNameSet_,
-      indexStartName_: this.indexStartName_,
-      endSet_: this.endSet_,
-      indexEndValue_: this.indexEndValue_,
-      endNameSet_: this.endNameSet_,
-      indexEndName_: this.indexEndName_,
-      viewFrom_: this.viewFrom_,
-      index_: this.index_.toString()
+      'limitSet': this.limitSet_,
+      'limit': this.limit_,
+      'startSet': this.startSet_,
+      'indexStartValue': this.indexStartValue_,
+      'startNameSet': this.startNameSet_,
+      'indexStartName': this.indexStartName_,
+      'endSet': this.endSet_,
+      'indexEndValue': this.indexEndValue_,
+      'endNameSet': this.endNameSet_,
+      'indexEndName': this.indexEndName_,
+      'viewFrom': this.viewFrom_,
+      'index': this.index_.toString()
     };
   }
 
@@ -467,7 +467,7 @@ export class QueryParams {
   static fromJSON(json: QueryParamsJSON): QueryParams {
     let index: Index;
 
-    switch (json.index_) {
+    switch (json['index']) {
       case '.priority':
         index = PRIORITY_INDEX;
         break;
@@ -479,24 +479,39 @@ export class QueryParams {
         break;
       default:
         // If it's neither of those then it's a path
-        index = new PathIndex(new Path(json.index_));
+        index = new PathIndex(new Path(json['index']));
     }
 
-    return QueryParams.prototype.copy_.call({...json, index_: index});
+    const params = new QueryParams();
+
+    params.limitSet_ = json['limitSet'];
+    params.limit_ = json['limit'];
+    params.startSet_ = json['startSet'];
+    params.indexStartValue_ = json['indexStartValue'];
+    params.startNameSet_ = json['startNameSet'];
+    params.indexStartName_ = json['indexStartName'];
+    params.endSet_ = json['endSet'];
+    params.indexEndValue_ = json['indexEndValue'];
+    params.endNameSet_ = json['endNameSet'];
+    params.indexEndName_ = json['indexEndName'];
+    params.index_ = index;
+    params.viewFrom_ = json['viewFrom'];
+
+    return params;
   }
 }
 
 export interface QueryParamsJSON {
-  limitSet_: boolean;
-  limit_: number;
-  startSet_: boolean;
-  indexStartValue_: any | null;
-  startNameSet_: boolean;
-  indexStartName_: string;
-  endSet_: boolean;
-  indexEndValue_: any | null;
-  endNameSet_: boolean;
-  indexEndName_: string;
-  viewFrom_: string;
-  index_: string;
+  limitSet: boolean;
+  limit: number;
+  startSet: boolean;
+  indexStartValue: any | null;
+  startNameSet: boolean;
+  indexStartName: string;
+  endSet: boolean;
+  indexEndValue: any | null;
+  endNameSet: boolean;
+  indexEndName: string;
+  viewFrom: string;
+  index: string;
 }
