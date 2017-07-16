@@ -163,6 +163,7 @@ function compileIndvES2015ModulesToBrowser() {
           return isFirebaseApp(fileName) ? `
           })().default;` : `
           } catch(error) {
+            console.error(error);
             throw new Error(
               'Cannot instantiate ${fileName} - ' +
               'be sure to load firebase-app.js first.'
@@ -203,7 +204,19 @@ function compileIndvES2015ModulesToBrowser() {
 }
 
 function buildBrowserFirebaseJs() {
-  return gulp.src('./dist/browser/*.js')
+  /*
+   The order of these files is important:
+    - `firebase-app.js` should always be the first one
+    - `firebase-database-persistence.js` should come after `firebase-database.js`
+  */
+  return gulp.src([
+    './dist/browser/firebase-app.js',
+    './dist/browser/firebase-auth.js',
+    './dist/browser/firebase-database.js',
+    './dist/browser/firebase-database-persistence.js',
+    './dist/browser/firebase-messaging.js',
+    './dist/browser/firebase-storage.js',
+  ])
     .pipe(sourcemaps.init({loadMaps: true}))
     .pipe(concat('firebase.js'))
     .pipe(sourcemaps.write('.'))
