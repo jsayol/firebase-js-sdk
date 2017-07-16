@@ -1,23 +1,23 @@
 /**
-* Copyright 2017 Google Inc.
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-*   http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
+ * Copyright 2017 Google Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 const gulp = require('gulp');
 const merge = require('merge2');
 const config = require('../config');
-const ts = require("gulp-typescript");
+const ts = require('gulp-typescript');
 const tsProject = ts.createProject('tsconfig.json');
 const babel = require('gulp-babel');
 const rename = require('gulp-rename');
@@ -40,9 +40,9 @@ const glob = require('glob');
 const fs = require('fs');
 const gzipSize = require('gzip-size');
 const WrapperPlugin = require('wrapper-webpack-plugin');
-const { CheckerPlugin } = require('awesome-typescript-loader');
+const {CheckerPlugin} = require('awesome-typescript-loader');
 
-function cleanDist(dir) { 
+function cleanDist(dir) {
   return function cleanDistDirectory(done) {
     rimraf(`${config.paths.outDir}${ dir ? `/${dir}` : ''}`, done);
   }
@@ -50,7 +50,7 @@ function cleanDist(dir) {
 
 function compileTypescriptToES2015() {
   const stream = tsProject.src()
-    .pipe(sourcemaps.init({ loadMaps: true }))
+    .pipe(sourcemaps.init({loadMaps: true}))
     .pipe(tsProject());
   return merge([
     stream.dts
@@ -63,7 +63,7 @@ function compileTypescriptToES2015() {
 
 function compileES2015ToCJS() {
   return gulp.src('dist/es2015/**/*.js')
-    .pipe(sourcemaps.init({ loadMaps: true }))
+    .pipe(sourcemaps.init({loadMaps: true}))
     .pipe(babel(config.babel))
     .pipe(sourcemaps.write('.'))
     .pipe(gulp.dest(`${config.paths.outDir}/cjs`))
@@ -71,8 +71,8 @@ function compileES2015ToCJS() {
 
 function processPrebuiltFilesForBrowser() {
   return gulp.src([
-      'src/**/*.build.js',
-    ])
+    'src/**/*.build.js',
+  ])
     .pipe(stripComments())
     .pipe(rename(_path => {
       _path.basename = `firebase-${_path.basename.replace('.build', '')}`;
@@ -83,14 +83,14 @@ function processPrebuiltFilesForBrowser() {
 
 function processPrebuiltFilesForCJS() {
   return gulp.src([
-      'src/**/*.build.js',
-    ])
+    'src/**/*.build.js',
+  ])
     .pipe(stripComments())
     .pipe(rename(_path => {
       _path.basename = `${_path.basename.replace('.build', '')}`;
       return _path;
     }))
-    .pipe(through.obj(function(file, encoding, cb) {
+    .pipe(through.obj(function (file, encoding, cb) {
       const _path = path.parse(file.path);
       const moduleName = _path.name.replace('.build', '').replace('-node', '');
 
@@ -112,6 +112,8 @@ function compileIndvES2015ModulesToBrowser() {
     const pathObj = path.parse(fileName);
     return pathObj.name === 'firebase-app';
   };
+
+  const nameCache = {};
 
   const webpackConfig = {
     devtool: 'source-map',
@@ -165,21 +167,28 @@ function compileIndvES2015ModulesToBrowser() {
               'Cannot instantiate ${fileName} - ' +
               'be sure to load firebase-app.js first.'
             )
-          }`        
+          }`
         }
       }),
-      new webpack.optimize.UglifyJsPlugin({
+      // new webpack.optimize.UglifyJsPlugin({
+      new (require('uglifyjs-webpack-plugin'))({
         sourceMap: true,
-        mangle: {
-          props: {
-            ignore_quoted: true,
-            regex: /^_|_$/,
+        uglifyOptions: {
+          sourceMap: true,
+          nameCache: nameCache,
+          mangle: {
+            cache: nameCache,
+            properties: {
+              cache: nameCache,
+              keep_quoted: true,
+              regex: /^_|_$/,
+            },
+          },
+          compress: {
+            // passes: 3,
+            // unsafe: true,
+            warnings: false,
           }
-        },
-        compress: {
-          passes: 3,
-          unsafe: true,
-          warnings: false,
         }
       })
     ],
@@ -189,13 +198,13 @@ function compileIndvES2015ModulesToBrowser() {
   };
 
   return gulp.src('src/**/*.ts')
-    .pipe(webpackStream(webpackConfig, webpack))
+    .pipe(webpackStream(webpackConfig, webpack, () => console.log(nameCache)))
     .pipe(gulp.dest(`${config.paths.outDir}/browser`));
 }
 
 function buildBrowserFirebaseJs() {
   return gulp.src('./dist/browser/*.js')
-    .pipe(sourcemaps.init({ loadMaps: true }))
+    .pipe(sourcemaps.init({loadMaps: true}))
     .pipe(concat('firebase.js'))
     .pipe(sourcemaps.write('.'))
     .pipe(gulp.dest(`${config.paths.outDir}/browser`));
@@ -206,11 +215,11 @@ function buildAltEnvFirebaseJs() {
     plugins: config.babel.plugins
   });
   return gulp.src([
-      './dist/es2015/firebase-browser.js',
-      './dist/es2015/firebase-node.js',
-      './dist/es2015/firebase-react-native.js',
-    ])
-    .pipe(sourcemaps.init({ loadMaps: true }))
+    './dist/es2015/firebase-browser.js',
+    './dist/es2015/firebase-node.js',
+    './dist/es2015/firebase-react-native.js',
+  ])
+    .pipe(sourcemaps.init({loadMaps: true}))
     .pipe(babel(babelConfig))
     .pipe(sourcemaps.write('.'))
     .pipe(gulp.dest(`${config.paths.outDir}/cjs`));
@@ -221,11 +230,11 @@ function copyPackageContents() {
     .pipe(gulp.dest(`${config.paths.outDir}/package`));
 
   const copyCJSCode = gulp.src([
-      './dist/cjs/**/*',
-      '!./dist/cjs/firebase.js*'
-    ])
+    './dist/cjs/**/*',
+    '!./dist/cjs/firebase.js*'
+  ])
     .pipe(gulp.dest(`${config.paths.outDir}/package`));
-  
+
   return merge([
     copyBrowserCode,
     copyCJSCode
@@ -245,7 +254,7 @@ function compileMetaFiles() {
       nyc: null,
       babel: null,
     });
-    
+
     // Delete all props that are falsy
     for (let key in obj) {
       if (!obj[key]) delete obj[key];
@@ -255,7 +264,7 @@ function compileMetaFiles() {
     return JSON.stringify(obj, null, 2);
   })(config.pkg);
 
-  const pkgJson = gulpFile('package.json', outPkg, {src: true })
+  const pkgJson = gulpFile('package.json', outPkg, {src: true})
 
   const copyFiles = gulp.src([
     'LICENSE',
@@ -273,7 +282,7 @@ function compileMetaFiles() {
     .pipe(gulp.dest(`${config.paths.outDir}/package/externs`));
 
   return merge([
-    merge([copyFiles,pkgJson])
+    merge([copyFiles, pkgJson])
       .pipe(gulp.dest(`${config.paths.outDir}/package`)),
     copyExterns,
     copyReadme
@@ -289,9 +298,9 @@ function injectSDKVersion() {
 
 function cleanComments() {
   return gulp.src([
-      './dist/package/**/*.js',
-      '!./dist/package/externs/*'
-    ], {base: '.'})
+    './dist/package/**/*.js',
+    '!./dist/package/externs/*'
+  ], {base: '.'})
     .pipe(stripComments({
       // TODO: Remove this comment in 3.8.0 release
       ignore: /\/\/# sourceMappingURL=.+\.map/g
@@ -341,7 +350,7 @@ THE SOFTWARE. */
     .pipe(gulpIf(file => {
       const _path = path.parse(file.path);
       return _path.base !== 'firebase.js' && !~_path.base.indexOf('database');
-    },header(licenseHeader), header(bigLicenseHeader)))
+    }, header(licenseHeader), header(bigLicenseHeader)))
     .pipe(gulp.dest('.'));
 }
 
@@ -351,34 +360,34 @@ function logFileSize(done) {
 
   const filePaths = glob.sync('./dist/browser/*.js');
   filePaths
-  .map(filePath => {
-    const _path = path.parse(filePath);
-    return path.resolve(_path.dir, `../package/${_path.base}`);
-  })
-  .map(filePath => {
-    const _path = path.parse(filePath);
-    const fileContents = fs.readFileSync(filePath, 'utf8');
-    const rawSize = fs.statSync(filePath).size;
-    const size = filesize(rawSize);
-    const gzip = filesize(gzipSize.sync(fileContents));
-    return {
-      file: _path.base,
-      size,
-      gzip
-    };
-  })
-  .forEach(obj => console.log(`| ${obj.file} | ${obj.size} | ${obj.gzip} |`));
-  
+    .map(filePath => {
+      const _path = path.parse(filePath);
+      return path.resolve(_path.dir, `../package/${_path.base}`);
+    })
+    .map(filePath => {
+      const _path = path.parse(filePath);
+      const fileContents = fs.readFileSync(filePath, 'utf8');
+      const rawSize = fs.statSync(filePath).size;
+      const size = filesize(rawSize);
+      const gzip = filesize(gzipSize.sync(fileContents));
+      return {
+        file: _path.base,
+        size,
+        gzip
+      };
+    })
+    .forEach(obj => console.log(`| ${obj.file} | ${obj.size} | ${obj.gzip} |`));
+
   console.log('\r\n');
   done();
 }
 
 /**
  * GULP TASKS
- * 
+ *
  * Gulp tasks in Gulp 4.0 are a description of a series of functions.
  * The functions are all above and are easier to maintain individually
- * 
+ *
  * Each "task" is then responsible for wiring up the dep trees itself,
  * because of this you have a finer degree of control of the ordering
  * of your tasks **and** you can optimize the parallelization of each
@@ -407,7 +416,7 @@ gulp.task('process:prebuilt', gulp.parallel([
 const compileSourceAssets = gulp.series([
   compileTypescriptToES2015,
   gulp.parallel([
-    compileIndvES2015ModulesToBrowser, 
+    compileIndvES2015ModulesToBrowser,
     compileES2015ToCJS,
   ])
 ]);
@@ -426,7 +435,7 @@ const buildSDK = exports.buildSDK = gulp.series([
   cleanDist(),
   gulp.parallel([
     compileSourceAssets,
-    processPrebuiltFilesForBrowser, 
+    processPrebuiltFilesForBrowser,
     processPrebuiltFilesForCJS,
     compileMetaFiles
   ]),

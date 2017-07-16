@@ -78,6 +78,7 @@
     "through2": "^2.0.3",
     "ts-node": "2.1.1",
     "typescript": "^2.2.1",
+    "uglifyjs-webpack-plugin": "beta",
     "validate-commit-msg": "^2.12.1",
     "vinyl-named": "^1.1.0",
     "webpack": "^3.0.0",
