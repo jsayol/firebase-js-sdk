@@ -31,11 +31,13 @@ const numQueriesToPrune = (cachePolicy: CachePolicy, numPrunable: number): numbe
 const boundLog = log.bind(null, 'TrackedQueryManager:') as (...args: any[]) => void;
 
 export class TrackedQueryManager {
+  initialized: Promise<void>;
+
   private nextId = 0;
   private trackedQueryTree_: ImmutableTree<TrackedQueryMap> = ImmutableTree.Empty;
 
   constructor(private trackedQueryStore_: TrackedQueryStore) {
-    this.trackedQueryStore_.load().then((trackedQueries: TrackedQuery[]) => {
+    this.initialized = this.trackedQueryStore_.load().then((trackedQueries: TrackedQuery[]) => {
       const lastUse = Date.now();
 
       trackedQueries.forEach((trackedQuery: TrackedQuery) => {
@@ -77,46 +79,52 @@ export class TrackedQueryManager {
   }
 
   private setActiveState_(query: Query, active: boolean) {
-    query = normalizeQuery(query);
-    let trackedQuery = this.find(query);
-    const lastUse = Date.now();
+    this.initialized.then(() => {
+      query = normalizeQuery(query);
+      let trackedQuery = this.find(query);
+      const lastUse = Date.now();
 
-    if (trackedQuery) {
-      trackedQuery.active = active;
-      trackedQuery.lastUse = lastUse;
-    } else {
-      assert(active, 'If we\'re setting the query to inactive, we should already be tracking it');
-      trackedQuery = new TrackedQuery(this.nextId++, query, lastUse, active);
-      this.cacheTrackedQuery_(trackedQuery);
-    }
+      if (trackedQuery) {
+        trackedQuery.active = active;
+        trackedQuery.lastUse = lastUse;
+      } else {
+        assert(active, 'If we\'re setting the query to inactive, we should already be tracking it');
+        trackedQuery = new TrackedQuery(this.nextId++, query, lastUse, active);
+        this.cacheTrackedQuery_(trackedQuery);
+      }
 
-    boundLog(`setActiveState id=${trackedQuery.id} active=${active}`);
-    this.trackedQueryStore_.save(trackedQuery);
+      boundLog(`setActiveState id=${trackedQuery.id} active=${active}`);
+      this.trackedQueryStore_.save(trackedQuery);
+    });
   }
 
   setComplete(query: Query) {
-    query = normalizeQuery(query);
-    let trackedQuery = this.find(query);
+    this.initialized.then(() => {
+      query = normalizeQuery(query);
+      let trackedQuery = this.find(query);
 
-    if (!trackedQuery) {
-      // We might have removed a query and pruned it before we got the complete message from the server
-      warn('Trying to set an untracked query as complete');
-    } else if (!trackedQuery.complete) {
-      trackedQuery.complete = true;
-      boundLog(`setComplete id=${trackedQuery.id}`);
-      this.trackedQueryStore_.save(trackedQuery);
-    }
+      if (!trackedQuery) {
+        // We might have removed a query and pruned it before we got the complete message from the server
+        warn('Trying to set an untracked query as complete');
+      } else if (!trackedQuery.complete) {
+        trackedQuery.complete = true;
+        boundLog(`setComplete id=${trackedQuery.id}`);
+        this.trackedQueryStore_.save(trackedQuery);
+      }
+    });
   }
 
   setCompletePath(path: Path) {
     boundLog(`setCompletePath path=${path}`);
-    this.trackedQueryTree_.subtree(path).foreach((path: Path, map: TrackedQueryMap) => {
-      forEach(map, (key: string, trackedQuery: TrackedQuery) => {
-        if (!trackedQuery.complete) {
-          trackedQuery.complete = true;
-          this.trackedQueryStore_.save(trackedQuery);
-        }
-      })
+    this.initialized.then(() => {
+      this.trackedQueryTree_.subtree(path).foreach((path: Path, map: TrackedQueryMap) => {
+        forEach(map, (key: string, trackedQuery: TrackedQuery) => {
+          if (!trackedQuery.complete) {
+            trackedQuery.complete = true;
+            this.trackedQueryStore_.save(trackedQuery);
+          }
+        })
+      });
     });
   }
 
@@ -135,21 +143,24 @@ export class TrackedQueryManager {
 
   ensureComplete(path: Path) {
     boundLog(`ensureComplete path=${path}`);
-    const query = Query.defaultAtPath(path);
 
-    if (!this.isIncludedInDefaultCompleteQuery_(query)) {
-      let trackedQuery = this.find(query);
+    this.initialized.then(() => {
+      const query = Query.defaultAtPath(path);
 
-      if (!trackedQuery) {
-        trackedQuery = new TrackedQuery(this.nextId++, query, Date.now(), false, true);
-        this.cacheTrackedQuery_(trackedQuery);
-      } else {
-        assert(!trackedQuery.complete, 'The tracked query was already marked as complete');
-        trackedQuery.complete = true;
+      if (!this.isIncludedInDefaultCompleteQuery_(query)) {
+        let trackedQuery = this.find(query);
+
+        if (!trackedQuery) {
+          trackedQuery = new TrackedQuery(this.nextId++, query, Date.now(), false, true);
+          this.cacheTrackedQuery_(trackedQuery);
+        } else {
+          assert(!trackedQuery.complete, 'The tracked query was already marked as complete');
+          trackedQuery.complete = true;
+        }
+
+        this.trackedQueryStore_.save(trackedQuery);
       }
-
-      this.trackedQueryStore_.save(trackedQuery);
-    }
+    });
   }
 
   private isIncludedInDefaultCompleteQuery_(query: Query): boolean {

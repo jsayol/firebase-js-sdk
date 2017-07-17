@@ -100,38 +100,40 @@ export class PersistenceManager {
   /* ======= [BEGIN] SERVER CACHE ======= */
 
   getServerCache(query: Query): Promise<CacheNode> {
-    let keysPromise: Promise<string[]>;
-    let complete: boolean;
+    return this.trackedQueryManager_.initialized.then(() => {
+      let keysPromise: Promise<string[]>;
+      let complete: boolean;
 
-    if (this.trackedQueryManager_.isComplete(query)) {
-      complete = true;
-      const trackedQuery = this.trackedQueryManager_.find(query);
-      boundLog(`getServerCache for complete query id=${trackedQuery.id}`);
+      if (this.trackedQueryManager_.isComplete(query)) {
+        complete = true;
+        const trackedQuery = this.trackedQueryManager_.find(query);
+        boundLog(`getServerCache for complete query id=${trackedQuery.id}`);
 
-      if (!query.getQueryParams().loadsAllData() && trackedQuery.complete) {
-        keysPromise = this.trackedQueryStore_.getKeys(trackedQuery.id);
+        if (!query.getQueryParams().loadsAllData() && trackedQuery.complete) {
+          keysPromise = this.trackedQueryStore_.getKeys(trackedQuery.id);
+        }
+      } else {
+        boundLog(`getServerCache for incomplete query path=${query.path}`);
+        complete = false;
+        keysPromise = this.trackedQueryManager_.knownCompleteChildren(query.path);
       }
-    } else {
-      boundLog(`getServerCache for incomplete query path=${query.path}`);
-      complete = false;
-      keysPromise = this.trackedQueryManager_.knownCompleteChildren(query.path);
-    }
 
-    let nodePromise: Promise<Node>;
+      let nodePromise: Promise<Node>;
 
-    if (keysPromise) {
-      nodePromise = keysPromise.then((keys: string[]) => this.serverCacheStore_.getForKeys(keys, query.path));
-    } else {
-      nodePromise = this.serverCacheStore_.getAtPath(query.path);
-    }
+      if (keysPromise) {
+        nodePromise = keysPromise.then((keys: string[]) => this.serverCacheStore_.getForKeys(keys, query.path));
+      } else {
+        nodePromise = this.serverCacheStore_.getAtPath(query.path);
+      }
 
-    return nodePromise
-      .then((node: Node) => new CacheNode(node, complete, !!keysPromise))
-      .catch((error: Error) => {
-        boundWarn('failed loading server cache.', error);
-        // Let's make sure to return an empty CacheNode
-        return new CacheNode(ChildrenNode.EMPTY_NODE, false, false);
-      });
+      return nodePromise
+        .then((node: Node) => new CacheNode(node, complete, !!keysPromise))
+        .catch((error: Error) => {
+          boundWarn('failed loading server cache.', error);
+          // Let's make sure to return an empty CacheNode
+          return new CacheNode(ChildrenNode.EMPTY_NODE, false, false);
+        });
+    });
   }
 
   applyServerOverwrite(node: Node, query: Query) {
@@ -156,7 +158,8 @@ export class PersistenceManager {
     if (this.cachePolicy_.shouldCheckSize(this.serverUpdatesSincePruneCheck_)) {
       boundLog(`reached prune check threshold after ${this.serverUpdatesSincePruneCheck_} updates. Checking...`);
       this.serverUpdatesSincePruneCheck_ = 0;
-      this.recursivePruneCheck_()
+      this.trackedQueryManager_.initialized
+        .then(() => this.recursivePruneCheck_())
         .then(() => {
           boundLog(`finished pruning server cache`);
         })
