@@ -26,6 +26,7 @@ import { RangedFilter } from './filter/RangedFilter';
 import { stringify } from '@firebase/util';
 import { NodeFilter } from './filter/NodeFilter';
 import { Index } from '../snap/indexes/Index';
+import { Path } from '../util/Path';
 
 /**
  * This class is an immutable-from-the-public-api struct containing a set of query parameters defining a
@@ -423,4 +424,92 @@ export class QueryParams {
 
     return qs;
   }
+
+  /**
+   * Returns a JSON serializable representation of this query parameters
+   *
+   * @return {Object}
+   */
+  toJSON(): QueryParamsJSON {
+    return {
+      limitSet: this.limitSet_,
+      limit: this.limit_,
+      startSet: this.startSet_,
+      indexStartValue: this.indexStartValue_,
+      startNameSet: this.startNameSet_,
+      indexStartName: this.indexStartName_,
+      endSet: this.endSet_,
+      indexEndValue: this.indexEndValue_,
+      endNameSet: this.endNameSet_,
+      indexEndName: this.indexEndName_,
+      viewFrom: this.viewFrom_,
+      index: this.index_.toString()
+    };
+  }
+
+  /**
+   * The string (serialized) representation of this object
+   *
+   * @return {string}
+   */
+  toString(): string {
+    return stringify(this.toJSON());
+  }
+
+  /**
+   * Creates a new QueryParams object from a previously serialized one
+   *
+   * @param json
+   * @return {QueryParams}
+   */
+  static fromJSON(json: QueryParamsJSON): QueryParams {
+    let index: Index;
+
+    switch (json['index']) {
+      case '.priority':
+        index = PRIORITY_INDEX;
+        break;
+      case '.key':
+        index = KEY_INDEX;
+        break;
+      case '.value':
+        index = VALUE_INDEX;
+        break;
+      default:
+        // If it's neither of those then it's a path
+        index = new PathIndex(new Path(json['index']));
+    }
+
+    const params = new QueryParams();
+
+    params.limitSet_ = json['limitSet'];
+    params.limit_ = json['limit'];
+    params.startSet_ = json['startSet'];
+    params.indexStartValue_ = json['indexStartValue'];
+    params.startNameSet_ = json['startNameSet'];
+    params.indexStartName_ = json['indexStartName'];
+    params.endSet_ = json['endSet'];
+    params.indexEndValue_ = json['indexEndValue'];
+    params.endNameSet_ = json['endNameSet'];
+    params.indexEndName_ = json['indexEndName'];
+    params.index_ = index;
+    params.viewFrom_ = json['viewFrom'];
+
+    return params;
+  }
+}
+
+export interface QueryParamsJSON {
+  limitSet: boolean;
+  limit: number;
+  startSet: boolean;
+  indexStartValue: any | null;
+  startNameSet: boolean;
+  indexStartName: string;
+  endSet: boolean;
+  indexEndValue: any | null;
+  endNameSet: boolean;
+  indexEndName: string;
+  viewFrom: string;
+  index: string;
 }

@@ -16,12 +16,12 @@
 
 import { nameCompare } from './util';
 import { stringLength } from '@firebase/util';
+
 /**
  * An immutable object representing a parsed path.  It's immutable so that you
  * can pass them around to other functions without worrying about them changing
  * it.
  */
-
 export class Path {
   private pieces_: string[];
   private pieceNum_: number;
@@ -95,10 +95,14 @@ export class Path {
     return null;
   }
 
-  toString(): string {
+  toString(trailing?: boolean): string {
     let pathString = '';
     for (let i = this.pieceNum_; i < this.pieces_.length; i++) {
       if (this.pieces_[i] !== '') pathString += '/' + this.pieces_[i];
+    }
+
+    if (trailing) {
+      pathString += '/';
     }
 
     return pathString || '/';

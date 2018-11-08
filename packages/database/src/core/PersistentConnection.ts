@@ -880,7 +880,7 @@ export class PersistentConnection extends ServerActions {
     // Remove the listen and manufacture a "permission_denied" error for the failed listen.
     let queryId;
     if (!query) {
-      queryId = 'default';
+      queryId = Query.DefaultIdentifier;
     } else {
       queryId = query.map(q => ObjectToUniqueKey(q)).join('$');
     }

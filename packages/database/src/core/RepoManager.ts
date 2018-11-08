@@ -118,6 +118,13 @@ export class RepoManager {
       );
     }
     repo.interrupt();
+
+    repo.closePersistence();
+    // TODO(jsayol): Use this check instead if we extract persistence into its own module
+    // if (typeof repo.closePersistence === 'function') {
+    //   repo.closePersistence();
+    // }
+
     delete appRepos[repo.repoInfo_.toURLString()];
   }
 

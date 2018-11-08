@@ -25,6 +25,10 @@ import { validateUrl } from '../core/util/validation';
 import { FirebaseApp } from '@firebase/app-types';
 import { FirebaseService } from '@firebase/app-types/private';
 import { RepoInfo } from '../core/RepoInfo';
+import {
+  StorageAdapter,
+  validateStorageAdapter
+} from '../core/persistence/storage/StorageAdapter';
 
 /**
  * Class representing a firebase database.
@@ -33,6 +37,7 @@ import { RepoInfo } from '../core/RepoInfo';
 export class Database implements FirebaseService {
   INTERNAL: DatabaseInternals;
   private root_: Reference;
+  private frozen_ = false;
 
   static readonly ServerValue = {
     TIMESTAMP: {
@@ -74,11 +79,21 @@ export class Database implements FirebaseService {
   ref(path?: string): Reference;
   ref(path?: Reference): Reference;
   ref(path?: string | Reference): Reference {
-    this.checkDeleted_('ref');
+    this.checkDeleted_('database.ref');
     validateArgCount('database.ref', 0, 1, arguments.length);
 
     if (path instanceof Reference) {
       return this.refFromURL(path.toString());
+    }
+
+    /*
+    Mark this database as "frozen" as soon as a reference is created.
+    We could actually wait until a read or write operation is initiated
+    on a Reference but that just complicates things unnecessarily, and
+    doing it this way achieves the same goal.
+     */
+    if (!this.frozen_) {
+      this.frozen_ = true;
     }
 
     return path !== undefined ? this.root_.child(path) : this.root_;
@@ -124,17 +139,52 @@ export class Database implements FirebaseService {
     }
   }
 
+  /**
+   * Checks that this database instance hasn't been marked as frozen
+   *
+   * @param {string} apiName
+   * @private
+   */
+  private checkFrozen_(apiName: string) {
+    if (this.frozen_) {
+      fatal(
+        `Calls to ${apiName} must be made before any other usage of the database`
+      );
+    }
+  }
+
   // Make individual repo go offline.
   goOffline() {
     validateArgCount('database.goOffline', 0, 0, arguments.length);
-    this.checkDeleted_('goOffline');
+    this.checkDeleted_('database.goOffline');
     this.repo_.interrupt();
   }
 
   goOnline() {
     validateArgCount('database.goOnline', 0, 0, arguments.length);
-    this.checkDeleted_('goOnline');
+    this.checkDeleted_('database.goOnline');
     this.repo_.resume();
+  }
+
+  /**
+   * Enable data persistence for the database.
+   * An optional storage adapter can be provided to be used instead
+   * of the default one.
+   *
+   * @param {?StorageAdapter=} storageAdapter An optional storage adapter
+   *   compliant with the API defined by StorageAdapter.
+   */
+  enablePersistence(storageAdapter?: StorageAdapter | null) {
+    const apiName = 'database.enablePersistence';
+    validateArgCount(apiName, 0, 2, arguments.length);
+    this.checkDeleted_(apiName);
+    this.checkFrozen_(apiName);
+
+    if (storageAdapter) {
+      validateStorageAdapter(apiName, storageAdapter);
+    }
+
+    this.repo_.enablePersistence(storageAdapter);
   }
 }
 
@@ -144,7 +194,7 @@ export class DatabaseInternals {
 
   /** @return {Promise<void>} */
   async delete(): Promise<void> {
-    (this.database as any).checkDeleted_('delete');
+    (this.database as any).checkDeleted_('database.delete');
     RepoManager.getInstance().deleteRepo((this.database as any).repo_ as Repo);
 
     (this.database as any).repo_ = null;

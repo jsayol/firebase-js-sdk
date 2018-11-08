@@ -16,6 +16,8 @@
 
 import { assert } from '@firebase/util';
 import { Path } from '../util/Path';
+import { Event } from '../view/Event';
+import { ProcessorResult } from '../view/ViewProcessor';
 
 /**
  *
@@ -52,6 +54,21 @@ export interface Operation {
    * @return {?Operation}
    */
   operationForChild(childName: string): Operation | null;
+}
+
+/**
+ * @interface
+ */
+export interface OperationResult {
+  /**
+   * @type {!ProcessorResult}
+   */
+  result: ProcessorResult;
+
+  /**
+   * @type {!Array.<!Event>}
+   */
+  events: Event[];
 }
 
 /**

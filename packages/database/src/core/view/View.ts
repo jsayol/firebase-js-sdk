@@ -21,7 +21,11 @@ import { CacheNode } from './CacheNode';
 import { ViewCache } from './ViewCache';
 import { EventGenerator } from './EventGenerator';
 import { assert } from '@firebase/util';
-import { Operation, OperationType } from '../operation/Operation';
+import {
+  Operation,
+  OperationType,
+  OperationResult
+} from '../operation/Operation';
 import { Change } from './Change';
 import { PRIORITY_INDEX } from '../snap/indexes/PriorityIndex';
 import { Query } from '../../api/Query';
@@ -136,6 +140,13 @@ export class View {
   }
 
   /**
+   * @return {!Node}
+   */
+  getEventCache(): Node {
+    return this.viewCache_.getEventCache().getNode();
+  }
+
+  /**
    * @return {boolean}
    */
   isEmpty(): boolean {
@@ -199,13 +210,13 @@ export class View {
    * @param {!Operation} operation
    * @param {!WriteTreeRef} writesCache
    * @param {?Node} completeServerCache
-   * @return {!Array.<!Event>}
+   * @return {!OperationResult}
    */
   applyOperation(
     operation: Operation,
     writesCache: WriteTreeRef,
     completeServerCache: Node | null
-  ): Event[] {
+  ): OperationResult {
     if (
       operation.type === OperationType.MERGE &&
       operation.source.queryId !== null
@@ -237,11 +248,13 @@ export class View {
 
     this.viewCache_ = result.viewCache;
 
-    return this.generateEventsForChanges_(
+    const events = this.generateEventsForChanges_(
       result.changes,
       result.viewCache.getEventCache().getNode(),
       null
     );
+
+    return { result, events };
   }
 
   /**

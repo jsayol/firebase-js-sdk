@@ -27,7 +27,10 @@ import { EventRegistration } from './view/EventRegistration';
 import { Node } from './snap/Node';
 import { Path } from './util/Path';
 import { Event } from './view/Event';
-import { Reference, ReferenceConstructor } from '../api/Reference';
+import { ReferenceConstructor } from '../api/Reference';
+import { PersistenceManager } from './persistence/PersistenceManager';
+import { KEY_INDEX } from './snap/indexes/KeyIndex';
+import { Change } from './view/Change';
 
 let __referenceConstructor: ReferenceConstructor;
 
@@ -56,6 +59,11 @@ export class SyncPoint {
   }
 
   /**
+   * @param {!PersistenceManager} persistenceManager_
+   */
+  constructor(private persistenceManager_: PersistenceManager) {}
+
+  /**
    * The Views being tracked at this location in the tree, stored as a map where the key is a
    * queryId and the value is the View for that query.
    *
@@ -77,29 +85,35 @@ export class SyncPoint {
    *
    * @param {!Operation} operation
    * @param {!WriteTreeRef} writesCache
-   * @param {?Node} optCompleteServerCache
+   * @param {?Node} completeServerCache
    * @return {!Array.<!Event>}
    */
   applyOperation(
     operation: Operation,
     writesCache: WriteTreeRef,
-    optCompleteServerCache: Node | null
+    completeServerCache: Node | null
   ): Event[] {
     const queryId = operation.source.queryId;
     if (queryId !== null) {
       const view = safeGet(this.views_, queryId);
       assert(view != null, 'SyncTree gave us an op for an invalid query.');
-      return view.applyOperation(
+      return this.applyOperationToView_(
+        view,
         operation,
         writesCache,
-        optCompleteServerCache
+        completeServerCache
       );
     } else {
       let events: Event[] = [];
 
-      forEach(this.views_, function(key: string, view: View) {
+      forEach(this.views_, (key: string, view: View) => {
         events = events.concat(
-          view.applyOperation(operation, writesCache, optCompleteServerCache)
+          this.applyOperationToView_(
+            view,
+            operation,
+            writesCache,
+            completeServerCache
+          )
         );
       });
 
@@ -108,25 +122,74 @@ export class SyncPoint {
   }
 
   /**
+   *
+   * @param {!View} view
+   * @param {!Operation} operation
+   * @param {!WriteTreeRef} writesCache
+   * @param {?Node} completeServerCache
+   */
+  private applyOperationToView_(
+    view: View,
+    operation: Operation,
+    writesCache: WriteTreeRef,
+    completeServerCache: Node | null
+  ): Event[] {
+    const applied = view.applyOperation(
+      operation,
+      writesCache,
+      completeServerCache
+    );
+
+    if (this.persistenceManager_ !== void 0) {
+      const query = view.getQuery();
+      if (!query.getQueryParams().loadsAllData()) {
+        const removedKeys: string[] = [];
+        const addedKeys: string[] = [];
+
+        applied.result.changes.forEach((change: Change) => {
+          if (change.type === Change.CHILD_ADDED) {
+            addedKeys.push(change.childName);
+          } else if (change.type === Change.CHILD_REMOVED) {
+            removedKeys.push(change.childName);
+          }
+        });
+
+        if (removedKeys.length > 0 || addedKeys.length > 0) {
+          this.persistenceManager_.updateTrackedQueryKeys(
+            query,
+            addedKeys,
+            removedKeys
+          );
+        }
+      }
+    }
+
+    return applied.events;
+  }
+
+  /**
    * Add an event callback for the specified query.
    *
    * @param {!Query} query
    * @param {!EventRegistration} eventRegistration
-   * @param {!WriteTreeRef} writesCache
-   * @param {?Node} serverCache Complete server cache, if we have it.
-   * @param {boolean} serverCacheComplete
+   * @param {WriteTreeRef=} writesCache
+   * @param {?Node=} serverCache Complete server cache, if we have it.
+   * @param {boolean=} serverCacheComplete
    * @return {!Array.<!Event>} Events to raise.
    */
   addEventRegistration(
     query: Query,
     eventRegistration: EventRegistration,
-    writesCache: WriteTreeRef,
-    serverCache: Node | null,
-    serverCacheComplete: boolean
+    writesCache?: WriteTreeRef,
+    serverCache?: Node | null,
+    serverCacheComplete?: boolean
   ): Event[] {
-    const queryId = query.queryIdentifier();
-    let view = safeGet(this.views_, queryId);
+    let view = this.viewForQuery(query);
     if (!view) {
+      assert(
+        !!writesCache && !!serverCache,
+        "Can't add an event registration with no view and no caches"
+      );
       // TODO: make writesCache take flag for complete server node
       let eventCache = writesCache.calcCompleteEventCache(
         serverCacheComplete ? serverCache : null
@@ -154,7 +217,20 @@ export class SyncPoint {
         )
       );
       view = new View(query, viewCache);
-      this.views_[queryId] = view;
+      this.views_[query.queryIdentifier()] = view;
+    }
+
+    if (this.persistenceManager_ !== void 0) {
+      // If this is a non-default query we need to tell persistence our current view of the data
+      if (!query.getQueryParams().loadsAllData()) {
+        const trackedQueryKeys: string[] = [];
+
+        view.getEventCache().forEachChild(KEY_INDEX, (key: string) => {
+          trackedQueryKeys.push(key);
+        });
+
+        this.persistenceManager_.setTrackedQueryKeys(query, trackedQueryKeys);
+      }
     }
 
     // This is guaranteed to exist now, we just created anything that was missing
@@ -182,7 +258,7 @@ export class SyncPoint {
     const removed: Query[] = [];
     let cancelEvents: Event[] = [];
     const hadCompleteView = this.hasCompleteView();
-    if (queryId === 'default') {
+    if (queryId === Query.DefaultIdentifier) {
       // When you do ref.off(...), we search all views for the registration to remove.
       const self = this;
       forEach(this.views_, function(viewQueryId: string, view: View) {
