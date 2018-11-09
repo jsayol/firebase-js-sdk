@@ -127,6 +127,7 @@ export class SyncPoint {
    * @param {!Operation} operation
    * @param {!WriteTreeRef} writesCache
    * @param {?Node} completeServerCache
+   * @return {!Array.<!Event>}
    */
   private applyOperationToView_(
     view: View,
@@ -184,7 +185,8 @@ export class SyncPoint {
     serverCache?: Node | null,
     serverCacheComplete?: boolean
   ): Event[] {
-    let view = this.viewForQuery(query);
+    const queryId = query.queryIdentifier();
+    let view = safeGet(this.views_, queryId);
     if (!view) {
       assert(
         !!writesCache && !!serverCache,
@@ -217,7 +219,7 @@ export class SyncPoint {
         )
       );
       view = new View(query, viewCache);
-      this.views_[query.queryIdentifier()] = view;
+      this.views_[queryId] = view;
     }
 
     if (this.persistenceManager_ !== void 0) {

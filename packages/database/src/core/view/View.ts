@@ -210,7 +210,7 @@ export class View {
    * @param {!Operation} operation
    * @param {!WriteTreeRef} writesCache
    * @param {?Node} completeServerCache
-   * @return {!OperationResult}
+   * @return {{result: !ProcessorResult, events: !Array.<!Event>}}
    */
   applyOperation(
     operation: Operation,

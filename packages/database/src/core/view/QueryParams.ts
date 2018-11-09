@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import { assert } from '@firebase/util';
+import { assert, stringify } from '@firebase/util';
 import { MIN_NAME, MAX_NAME } from '../util/util';
 import { KEY_INDEX } from '../snap/indexes/KeyIndex';
 import { PRIORITY_INDEX } from '../snap/indexes/PriorityIndex';
@@ -23,7 +23,6 @@ import { PathIndex } from '../snap/indexes/PathIndex';
 import { IndexedFilter } from './filter/IndexedFilter';
 import { LimitedFilter } from './filter/LimitedFilter';
 import { RangedFilter } from './filter/RangedFilter';
-import { stringify } from '@firebase/util';
 import { NodeFilter } from './filter/NodeFilter';
 import { Index } from '../snap/indexes/Index';
 import { Path } from '../util/Path';
@@ -465,7 +464,7 @@ export class QueryParams {
   static fromJSON(json: QueryParamsJSON): QueryParams {
     let index: Index;
 
-    switch (json['index']) {
+    switch (json.index) {
       case '.priority':
         index = PRIORITY_INDEX;
         break;
@@ -477,23 +476,23 @@ export class QueryParams {
         break;
       default:
         // If it's neither of those then it's a path
-        index = new PathIndex(new Path(json['index']));
+        index = new PathIndex(new Path(json.index));
     }
 
     const params = new QueryParams();
 
-    params.limitSet_ = json['limitSet'];
-    params.limit_ = json['limit'];
-    params.startSet_ = json['startSet'];
-    params.indexStartValue_ = json['indexStartValue'];
-    params.startNameSet_ = json['startNameSet'];
-    params.indexStartName_ = json['indexStartName'];
-    params.endSet_ = json['endSet'];
-    params.indexEndValue_ = json['indexEndValue'];
-    params.endNameSet_ = json['endNameSet'];
-    params.indexEndName_ = json['indexEndName'];
+    params.limitSet_ = json.limitSet;
+    params.limit_ = json.limit;
+    params.startSet_ = json.startSet;
+    params.indexStartValue_ = json.indexStartValue;
+    params.startNameSet_ = json.startNameSet;
+    params.indexStartName_ = json.indexStartName;
+    params.endSet_ = json.endSet;
+    params.indexEndValue_ = json.indexEndValue;
+    params.endNameSet_ = json.endNameSet;
+    params.indexEndName_ = json.indexEndName;
     params.index_ = index;
-    params.viewFrom_ = json['viewFrom'];
+    params.viewFrom_ = json.viewFrom;
 
     return params;
   }

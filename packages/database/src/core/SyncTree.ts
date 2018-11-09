@@ -114,7 +114,7 @@ export class SyncTree {
   /**
    * Set the persistence manager to use
    *
-   * @param manager
+   * @param {!PersistenceManager} manager
    */
   set persistenceManager(manager: PersistenceManager) {
     this.persistenceManager_ = manager;
@@ -188,33 +188,28 @@ export class SyncTree {
     const write = this.pendingWriteTree_.getWrite(writeId);
     const needToReevaluate = this.pendingWriteTree_.removeWrite(writeId);
 
-    if (write.visible && this.persistenceManager_ !== void 0) {
-      if (persist) {
-        this.persistenceManager_.removeUserWrite(writeId);
+    if (write.visible && persist && this.persistenceManager_ !== void 0) {
+      this.persistenceManager_.removeUserWrite(writeId);
 
-        if (!revert) {
-          assert(
-            repo,
-            'Cannot resolve deferred values without a repo instance'
+      if (!revert) {
+        assert(repo, 'Cannot resolve deferred values without a repo instance');
+        const serverValues = repo.generateServerValues();
+
+        if (write.snap !== void 0) {
+          const resolvedNode = resolveDeferredValueSnapshot(
+            write.snap,
+            serverValues
           );
-          const serverValues = repo.generateServerValues();
-
-          if (write.snap !== void 0) {
-            const resolvedNode = resolveDeferredValueSnapshot(
-              write.snap,
+          this.persistenceManager_.applyUserWrite(resolvedNode, write.path);
+        } else {
+          const resolvedMerge: { [k: string]: Node } = {};
+          forEach(write.children, (childPath: string, childNode: Node) => {
+            resolvedMerge[childPath] = resolveDeferredValueSnapshot(
+              childNode,
               serverValues
             );
-            this.persistenceManager_.applyUserWrite(resolvedNode, write.path);
-          } else {
-            const resolvedMerge: { [k: string]: Node } = {};
-            forEach(write.children, (childPath: string, childNode: Node) => {
-              resolvedMerge[childPath] = resolveDeferredValueSnapshot(
-                childNode,
-                serverValues
-              );
-            });
-            this.persistenceManager_.applyUserMerge(resolvedMerge, write.path);
-          }
+          });
+          this.persistenceManager_.applyUserMerge(resolvedMerge, write.path);
         }
       }
     }
