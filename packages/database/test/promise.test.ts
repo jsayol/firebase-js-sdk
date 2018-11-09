@@ -26,13 +26,13 @@ import { Reference } from '../src/api/Reference';
 // TODO: Fix the flakey test suite
 describe.skip('Promise Tests', function() {
   it('wraps Query.once', function() {
-    return (getRandomNode() as Reference).once('value').then(function(snap) {
+    return getRandomNode().once('value').then(function(snap) {
       expect(snap.val()).to.equal(null);
     });
   });
 
   it('wraps Firebase.set', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     return ref
       .set(5)
       .then(function() {
@@ -44,7 +44,7 @@ describe.skip('Promise Tests', function() {
   });
 
   it('wraps Firebase.push when no value is passed', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     const pushed = ref.push();
     return pushed
       .then(function(childRef) {
@@ -59,7 +59,7 @@ describe.skip('Promise Tests', function() {
   });
 
   it('wraps Firebase.push when a value is passed', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     const pushed = ref.push(6);
     return pushed
       .then(function(childRef) {
@@ -74,7 +74,7 @@ describe.skip('Promise Tests', function() {
   });
 
   it('wraps Firebase.remove', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     return ref
       .set({ a: 'b' })
       .then(function() {
@@ -91,7 +91,7 @@ describe.skip('Promise Tests', function() {
   });
 
   it('wraps Firebase.update', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     return ref
       .set({ a: 'b' })
       .then(function() {
@@ -108,7 +108,7 @@ describe.skip('Promise Tests', function() {
   });
 
   it('wraps Fireabse.setPriority', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     return ref
       .set({ a: 'b' })
       .then(function() {
@@ -125,7 +125,7 @@ describe.skip('Promise Tests', function() {
   });
 
   it('wraps Firebase.setWithPriority', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     return ref
       .setWithPriority('hi', 5)
       .then(function() {
@@ -138,7 +138,7 @@ describe.skip('Promise Tests', function() {
   });
 
   it('wraps Firebase.transaction', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     return ref
       .transaction(function() {
         return 5;
@@ -158,7 +158,7 @@ describe.skip('Promise Tests', function() {
   it('exposes catch in the return of Firebase.push', function() {
     // Catch is a pain in the bum to provide safely because "catch" is a reserved word and ES3 and below require
     // you to use quotes to define it, but the closure linter really doesn't want you to do that either.
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     const pushed = ref.push(6);
 
     expect(typeof ref.then === 'function').to.equal(false);

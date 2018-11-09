@@ -75,7 +75,7 @@ describe('.info Tests', function() {
 
   it('Can watch .info/connected.', function() {
     return new Promise(resolve => {
-      const f = (getRandomNode() as Reference).root;
+      const f = getRandomNode().root;
       f.child('.info/connected').on('value', function(snap) {
         if (snap.val() === true) resolve();
       });
@@ -83,7 +83,7 @@ describe('.info Tests', function() {
   });
 
   it('.info/connected correctly goes to false when disconnected.', async function() {
-    const f = (getRandomNode() as Reference).root;
+    const f = getRandomNode().root;
     let everConnected = false;
     let connectHistory = '';
 

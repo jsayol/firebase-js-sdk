@@ -89,6 +89,16 @@ export class Repo {
   private persistenceManager_: PersistenceManager;
 
   /**
+   * A promise used as a way to signal that any pending new event callbacks
+   * have been registered.
+   *
+   * TODO(jsayol): This should be @private but it's used by query.test.ts
+   *
+   * @type {Promise.<void>}
+   */
+  eventCallbacksAdded_ = Promise.resolve();
+
+  /**
    * @param {!RepoInfo} repoInfo_
    * @param {boolean} forceRestClient
    * @param {!FirebaseApp} app
@@ -604,24 +614,20 @@ export class Repo {
    * @param {!EventRegistration} eventRegistration
    */
   addEventCallbackForQuery(query: Query, eventRegistration: EventRegistration) {
-    let eventsPromise: Promise<Event[]>;
+    this.eventCallbacksAdded_ = this.eventCallbacksAdded_
+      .catch(() => void 0)
+      .then(() => {
+        const syncTree =
+          query.path.getFront() === '.info'
+            ? this.infoSyncTree_
+            : this.serverSyncTree_;
 
-    if (query.path.getFront() === '.info') {
-      eventsPromise = this.infoSyncTree_.addEventRegistration(
-        query,
-        eventRegistration
-      );
-    } else {
-      eventsPromise = this.serverSyncTree_.addEventRegistration(
-        query,
-        eventRegistration
-      );
-    }
-
-    // this.eventQueue_.raiseEventsAtPath(query.path, events);
-    eventsPromise.then((events: Event[]) => {
-      this.eventQueue_.raiseEventsAtPath(query.path, events);
-    });
+        return syncTree
+          .addEventRegistration(query, eventRegistration)
+          .then((events: Event[]) => {
+            this.eventQueue_.raiseEventsAtPath(query.path, events);
+          });
+      });
   }
 
   /**

@@ -89,7 +89,9 @@ export function getRootNode(i = 0, ref?: string) {
  * @param {int=} numNodes
  * @return {Reference|Array<Reference>}
  */
-export function getRandomNode(numNodes?): Reference | Array<Reference> {
+export function getRandomNode(numNodes?: undefined): Reference;
+export function getRandomNode(numNodes: number): Array<Reference>;
+export function getRandomNode(numNodes?: number): Reference | Array<Reference> {
   if (numNodes === undefined) {
     return <Reference>getRandomNode(1)[0];
   }

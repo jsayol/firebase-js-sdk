@@ -47,7 +47,7 @@ describe('Transaction Tests', function() {
   });
 
   it('New value is immediately visible.', function() {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
     node.child('foo').transaction(function() {
       return 42;
     });
@@ -60,7 +60,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Event is raised for new value.', function() {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
     const fooNode = node.child('foo');
     const eventHelper = eventTestHelper([[fooNode, ['value', '']]]);
 
@@ -72,7 +72,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Transaction result can be converted to JSON.', function() {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
 
     return node
       .transaction(() => {
@@ -87,7 +87,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Non-aborted transaction sets committed to true in callback.', function(done) {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
 
     node.transaction(
       function() {
@@ -103,7 +103,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Aborted transaction sets committed to false in callback.', function(done) {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
 
     node.transaction(
       function() {},
@@ -154,7 +154,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Use transaction to create a node, make sure exactly one event is received.', function() {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
     let events = 0,
       done = false;
 
@@ -214,7 +214,7 @@ describe('Transaction Tests', function() {
   );
 
   it('Transaction is only called once when initializing an empty node.', function() {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
     let updateCalled = 0;
 
     const ea = EventAccumulatorFactory.waitsForCount(1);
@@ -292,7 +292,7 @@ describe('Transaction Tests', function() {
     let firstDone = false,
       secondDone = false,
       thirdDone = false;
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
     let nodeSnap = null;
     let nodeFooSnap = null;
 
@@ -381,7 +381,7 @@ describe('Transaction Tests', function() {
   });
 
   it('transaction(), set(), set() should work.', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     ref.transaction(
       function(curr) {
         expect(curr).to.equal(null);
@@ -399,7 +399,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Priority is preserved when setting data.', async function() {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
     let complete = false;
     let snap;
     node.on('value', function(s) {
@@ -487,7 +487,7 @@ describe('Transaction Tests', function() {
       return 'duck, duck, goose.';
     });
 
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
     let tries = 0;
     node.transaction(
       function(curr) {
@@ -530,7 +530,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Update should not cancel unrelated transactions', async function() {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
     let fooTransactionDone = false;
     let barTransactionDone = false;
     restoreHash = hijackHash(function() {
@@ -597,7 +597,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Test immediately aborted transaction.', function(done) {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
     // without callback.
     node.transaction(function(curr) {
       return;
@@ -616,7 +616,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Test adding to an array with a transaction.', function(done) {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
     node.set(['cat', 'horse'], function() {
       node.transaction(
         function(current) {
@@ -681,7 +681,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Doing set() in successful transaction callback works. Case 870.', function(done) {
-    const node = getRandomNode() as Reference;
+    const node = getRandomNode();
     let transactionCalled = false;
     let callbackCalled = false;
     node.transaction(
@@ -729,7 +729,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Pending transactions are canceled on disconnect.', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     // wait to be connected and some data set.
     ref.set('initial', function() {
@@ -752,7 +752,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Transaction without local events (1)', async function() {
-    const ref = getRandomNode() as Reference,
+    const ref = getRandomNode(),
       actions = [];
     let ea = EventAccumulatorFactory.waitsForCount(1);
 
@@ -876,7 +876,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Transaction from value callback.', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     const COUNT = 1;
     ref.on('value', function(snap) {
       let shouldCommit = true;
@@ -904,7 +904,7 @@ describe('Transaction Tests', function() {
   it('Transaction runs on null only once after reconnect (Case 1981).', async function() {
     if (!canCreateExtraConnections()) return;
 
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     await ref.set(42);
     const newRef = getFreshRepoFromReference(ref);
     let run = 0;
@@ -976,7 +976,7 @@ describe('Transaction Tests', function() {
         );
     }
 
-    const firebase = getRandomNode() as Reference;
+    const firebase = getRandomNode();
     firebase.database.goOffline();
     firebase.database.goOnline();
     let count = 0;
@@ -987,7 +987,7 @@ describe('Transaction Tests', function() {
   });
 
   it('transaction() respects .priority.', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     const values = [];
     ref.on('value', function(s) {
       values.push(s.exportVal());
@@ -1036,7 +1036,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Transaction with integer keys', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     ref.set({ 1: 1, 5: 5, 10: 10, 20: 20 }, function() {
       ref.transaction(
         function(current) {
@@ -1052,7 +1052,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Return null from first run of transaction.', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     ref.transaction(
       function(c) {
         return null;
@@ -1067,7 +1067,7 @@ describe('Transaction Tests', function() {
 
   // https://app.asana.com/0/5673976843758/9259161251948
   it('Bubble-app transaction bug.', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     ref.child('a').transaction(function() {
       return 1;
     });
@@ -1095,7 +1095,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Transaction and priority: Can set priority in transaction on empty node', async function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     await ref.transaction(function(current) {
       return { '.value': 42, '.priority': 7 };
@@ -1107,7 +1107,7 @@ describe('Transaction Tests', function() {
   });
 
   it("Transaction and priority: Transaction doesn't change priority.", async function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     await ref.set({ '.value': 42, '.priority': 7 });
 
@@ -1121,7 +1121,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Transaction and priority: Transaction can change priority on non-empty node.', async function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     await ref.set({ '.value': 42, '.priority': 7 });
 
@@ -1135,7 +1135,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Transaction and priority: Changing priority on siblings.', async function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     await ref.set({
       a: { '.value': 'a', '.priority': 'a' },
@@ -1161,7 +1161,7 @@ describe('Transaction Tests', function() {
   });
 
   it('Transaction and priority: Leaving priority on siblings.', async function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     await ref.set({
       a: { '.value': 'a', '.priority': 'a' },
@@ -1309,7 +1309,7 @@ describe('Transaction Tests', function() {
   });
 
   it("transaction() still works when there's a query listen.", function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     ref.set(
       {
@@ -1338,7 +1338,7 @@ describe('Transaction Tests', function() {
   });
 
   it("transaction() on queried location doesn't run initially on null (firebase-worker-queue depends on this).", function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
     ref.push({ a: 1, b: 2 }, function() {
       ref
         .startAt()
@@ -1361,7 +1361,7 @@ describe('Transaction Tests', function() {
   });
 
   it('transactions raise correct child_changed events on queries', async function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     const value = { foo: { value: 1 } };
     const snapshots = [];
@@ -1398,7 +1398,7 @@ describe('Transaction Tests', function() {
   });
 
   it('transactions can use local merges', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     ref.update({ foo: 'bar' });
 
@@ -1416,7 +1416,7 @@ describe('Transaction Tests', function() {
   });
 
   it('transactions works with merges without the transaction path', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     ref.update({ foo: 'bar' });
 
@@ -1435,7 +1435,7 @@ describe('Transaction Tests', function() {
 
   //See https://app.asana.com/0/15566422264127/23303789496881
   it('out of order remove writes are handled correctly', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     ref.set({ foo: 'bar' });
     ref.transaction(

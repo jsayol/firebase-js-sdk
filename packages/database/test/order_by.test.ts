@@ -22,10 +22,10 @@ import { Reference } from '../src/api/Reference';
 describe('.orderBy tests', function() {
   // TODO: setup spy on console.warn
 
-  const clearRef = getRandomNode() as Reference;
+  const clearRef = getRandomNode();
 
   it('Snapshots are iterated in order', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     const initial = {
       alex: { nuggets: 60 },
@@ -63,7 +63,7 @@ describe('.orderBy tests', function() {
   });
 
   it('Snapshots are iterated in order for value', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     const initial = {
       alex: 60,
@@ -101,7 +101,7 @@ describe('.orderBy tests', function() {
   });
 
   it('Fires child_moved events', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     const initial = {
       alex: { nuggets: 60 },
@@ -127,7 +127,7 @@ describe('.orderBy tests', function() {
   });
 
   it('Callback removal works', async function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     let reads = 0;
     let fooCb;
@@ -176,7 +176,7 @@ describe('.orderBy tests', function() {
   });
 
   it('child_added events are in the correct order', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     const initial = {
       a: { value: 5 },
@@ -200,7 +200,7 @@ describe('.orderBy tests', function() {
   });
 
   it('Can use key index', async function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     const data = {
       a: { '.priority': 10, '.value': 'a' },
@@ -242,7 +242,7 @@ describe('.orderBy tests', function() {
   });
 
   it('Queries work on leaf nodes', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     ref.set('leaf-node', function() {
       ref
@@ -323,7 +323,7 @@ describe('.orderBy tests', function() {
   });
 
   it('startAt/endAt works on value index', function() {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     const initial = {
       alex: 60,
@@ -364,7 +364,7 @@ describe('.orderBy tests', function() {
   });
 
   it('Removing default listener removes non-default listener that loads all data', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     const initial = { key: 'value' };
     ref.set(initial, function(err) {
@@ -383,7 +383,7 @@ describe('.orderBy tests', function() {
   });
 
   it('Can define and use an deep index', function(done) {
-    const ref = getRandomNode() as Reference;
+    const ref = getRandomNode();
 
     const initial = {
       alex: { deep: { nuggets: 60 } },
