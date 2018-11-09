@@ -185,8 +185,7 @@ export class SyncPoint {
     serverCache?: Node | null,
     serverCacheComplete?: boolean
   ): Event[] {
-    const queryId = query.queryIdentifier();
-    let view = safeGet(this.views_, queryId);
+    let view = this.viewForQuery(query);
     if (!view) {
       assert(
         !!writesCache && !!serverCache,
@@ -219,7 +218,7 @@ export class SyncPoint {
         )
       );
       view = new View(query, viewCache);
-      this.views_[queryId] = view;
+      this.views_[query.queryIdentifier()] = view;
     }
 
     if (this.persistenceManager_ !== void 0) {

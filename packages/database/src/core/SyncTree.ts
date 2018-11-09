@@ -429,81 +429,73 @@ export class SyncTree {
       this.persistenceManager_.setQueryActive(query);
     }
 
-    let eventsPromise: Promise<Event[]>;
-
     const viewAlreadyExists = syncPoint.viewExistsForQuery(query);
 
-    if (viewAlreadyExists) {
-      eventsPromise = Promise.resolve(
-        syncPoint.addEventRegistration(query, eventRegistration)
+    if (!viewAlreadyExists && !query.getQueryParams().loadsAllData()) {
+      // We need to track a tag for this query
+      const queryKey = SyncTree.makeQueryKey_(query);
+      assert(
+        !contains(this.queryToTagMap_, queryKey),
+        'View does not exist, but we have a tag'
       );
+      const tag = SyncTree.getNextQueryTag_();
+      this.queryToTagMap_[queryKey] = tag;
+      // Coerce to string to avoid sparse arrays.
+      this.tagToQueryMap_['_' + tag] = query;
+    }
+
+    let eventsPromise: Promise<Event[]>;
+    const writesCache = this.pendingWriteTree_.childWrites(path);
+
+    if (serverCache !== null) {
+      // We already found a complete server cache in memory
+      const events = syncPoint.addEventRegistration(
+        query,
+        eventRegistration,
+        writesCache,
+        serverCache,
+        true
+      );
+      eventsPromise = Promise.resolve(events);
     } else {
-      if (!query.getQueryParams().loadsAllData()) {
-        // We need to track a tag for this query
-        const queryKey = SyncTree.makeQueryKey_(query);
-        assert(
-          !contains(this.queryToTagMap_, queryKey),
-          'View does not exist, but we have a tag'
-        );
-        const tag = SyncTree.getNextQueryTag_();
-        this.queryToTagMap_[queryKey] = tag;
-        // Coerce to string to avoid sparse arrays.
-        this.tagToQueryMap_['_' + tag] = query;
-      }
+      if (this.persistenceManager_ !== void 0) {
+        // Get the server cache from persistence
+        eventsPromise = this.persistenceManager_
+          .getServerCache(query)
+          .then((cacheNode: CacheNode) => {
+            return syncPoint.addEventRegistration(
+              query,
+              eventRegistration,
+              writesCache,
+              cacheNode.getNode(),
+              cacheNode.isFullyInitialized()
+            );
+          });
+      } else {
+        // No complete server cache in memory, and persistence disabled
+        serverCache = ChildrenNode.EMPTY_NODE as Node;
 
-      const writesCache = this.pendingWriteTree_.childWrites(path);
+        const subtree = this.syncPointTree_.subtree(path);
+        subtree.foreachChild((childName, childSyncPoint) => {
+          const completeCache = childSyncPoint.getCompleteServerCache(
+            Path.Empty
+          );
+          if (completeCache) {
+            serverCache = serverCache.updateImmediateChild(
+              childName,
+              completeCache
+            );
+          }
+        });
 
-      if (serverCache !== null) {
-        // We already found a complete server cache in memory
         const events = syncPoint.addEventRegistration(
           query,
           eventRegistration,
           writesCache,
           serverCache,
-          true
+          false
         );
         eventsPromise = Promise.resolve(events);
-      } else {
-        if (this.persistenceManager_ !== void 0) {
-          // Get the server cache from persistence
-          eventsPromise = this.persistenceManager_
-            .getServerCache(query)
-            .then((cacheNode: CacheNode) => {
-              return syncPoint.addEventRegistration(
-                query,
-                eventRegistration,
-                writesCache,
-                cacheNode.getNode(),
-                cacheNode.isFullyInitialized()
-              );
-            });
-        } else {
-          // No complete server cache in memory and persistence disabled
-          serverCache = ChildrenNode.EMPTY_NODE as Node;
-
-          const subtree = this.syncPointTree_.subtree(path);
-          subtree.foreachChild((childName, childSyncPoint) => {
-            const completeCache = childSyncPoint.getCompleteServerCache(
-              Path.Empty
-            );
-            if (completeCache) {
-              serverCache = serverCache.updateImmediateChild(
-                childName,
-                completeCache
-              );
-            }
-          });
-
-          const events = syncPoint.addEventRegistration(
-            query,
-            eventRegistration,
-            writesCache,
-            serverCache,
-            false
-          );
-
-          eventsPromise = Promise.resolve(events);
-        }
       }
     }
 
