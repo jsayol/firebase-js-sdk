@@ -18,7 +18,7 @@ import { expect } from 'chai';
 import { Reference } from '../src/api/Reference';
 import { Query } from '../src/api/Query';
 import '../src/core/snap/ChildrenNode';
-import { getRandomNode, getPath, pause } from './helpers/util';
+import { getRandomNode, getPath, pause, repoCallbacksAdded } from './helpers/util';
 import {
   EventAccumulator,
   EventAccumulatorFactory
@@ -30,16 +30,18 @@ type TaskList = [Query, any][];
 
 describe('Query Tests', function() {
   // Little helper class for testing event callbacks w/ contexts.
-  const EventReceiver = function() {
-    this.gotValue = false;
-    this.gotChildAdded = false;
-  };
-  EventReceiver.prototype.onValue = function() {
-    this.gotValue = true;
-  };
-  EventReceiver.prototype.onChildAdded = function() {
-    this.gotChildAdded = true;
-  };
+  class EventReceiver {
+    gotValue = false;
+    gotChildAdded = false;
+
+    onValue() {
+      this.gotValue = true;
+    }
+
+    onChildAdded() {
+      this.gotChildAdded = true;
+    }
+  }
 
   it('Can create basic queries.', function() {
     const path = getRandomNode();
@@ -441,10 +443,6 @@ describe('Query Tests', function() {
     ).to.be.false;
   });
 
-  function repoCallbackAdded(node: Reference): Promise<void> {
-    return node.repo.eventCallbacksAdded_;
-  }
-
   it('Query.off can be called on the default query.', async function() {
     const path = getRandomNode();
     let eventFired = false;
@@ -453,7 +451,7 @@ describe('Query Tests', function() {
       eventFired = true;
     };
     path.limitToLast(5).on('value', callback);
-    await repoCallbackAdded(path);
+    await repoCallbacksAdded(path);
 
     path.set({ a: 5, b: 6 });
     expect(eventFired).to.be.true;
@@ -472,7 +470,7 @@ describe('Query Tests', function() {
       eventFired = true;
     };
     path.limitToLast(5).on('value', callback);
-    await repoCallbackAdded(path);
+    await repoCallbacksAdded(path);
 
     path.set({ a: 5, b: 6 });
     expect(eventFired).to.be.true;
@@ -495,7 +493,7 @@ describe('Query Tests', function() {
     };
     path.on('value', callback1);
     path.limitToLast(5).on('value', callback2);
-    await repoCallbackAdded(path);
+    await repoCallbacksAdded(path);
 
     path.set({ a: 5, b: 6 });
     expect(eventFired).to.be.true;
@@ -518,7 +516,7 @@ describe('Query Tests', function() {
     };
     path.on('value', callback1);
     path.limitToLast(5).on('value', callback2);
-    await repoCallbackAdded(path);
+    await repoCallbacksAdded(path);
 
     path.set({ a: 5, b: 6 });
     expect(eventFired).to.be.true;
@@ -537,7 +535,7 @@ describe('Query Tests', function() {
 
     ref.on('value', a.onValue, a);
     ref.on('value', b.onValue, b);
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.set('hello!');
     expect(a.gotValue).to.be.true;
@@ -563,7 +561,7 @@ describe('Query Tests', function() {
 
     ref.on('child_added', a.onChildAdded, a);
     ref.on('child_added', b.onChildAdded, b);
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.push('hello!');
     expect(a.gotChildAdded).to.be.true;
@@ -589,7 +587,7 @@ describe('Query Tests', function() {
 
     ref.on('value', a.onValue, a);
     ref.on('value', b.onValue, b);
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.set('hello!');
     expect(a.gotValue).to.be.true;
@@ -613,7 +611,7 @@ describe('Query Tests', function() {
 
     ref.on('child_added', a.onChildAdded, a);
     ref.on('child_added', b.onChildAdded, b);
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.push('hello!');
     expect(a.gotChildAdded).to.be.true;
@@ -639,7 +637,7 @@ describe('Query Tests', function() {
     ref.on('value', b.onValue, b);
     ref.on('child_added', a.onChildAdded, a);
     ref.on('child_added', b.onChildAdded, b);
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.set(null);
     ref.push('hello!');
@@ -666,7 +664,7 @@ describe('Query Tests', function() {
     node.limitToLast(5).on('value', function(s) {
       snap = s;
     });
-    await repoCallbackAdded(node);
+    await repoCallbacksAdded(node);
 
     node.set({});
     for (let i = 0; i < 10; i++) {
@@ -854,7 +852,7 @@ describe('Query Tests', function() {
     node.limitToLast(2).on('child_removed', function(snap) {
       removed += snap.key + ' ';
     });
-    await repoCallbackAdded(node);
+    await repoCallbacksAdded(node);
 
     node.set({ a: 1, b: 2, c: 3 });
 
@@ -913,7 +911,7 @@ describe('Query Tests', function() {
       .on('child_removed', function(snap) {
         removed += snap.key + ' ';
       });
-    await repoCallbackAdded(node);
+    await repoCallbacksAdded(node);
 
     node.set({ a: 1, b: 2, c: 3 });
     expect(added).to.equal('a b ');
@@ -976,7 +974,7 @@ describe('Query Tests', function() {
       .on('child_removed', function(snap) {
         removed += snap.key + ' ';
       });
-    await repoCallbackAdded(node);
+    await repoCallbacksAdded(node);
 
     node.set({ c: 3 });
     expect(added).to.equal('c ');
@@ -1036,7 +1034,7 @@ describe('Query Tests', function() {
     node.limitToLast(2).on('child_removed', function(snap) {
       removed += snap.key + ' ';
     });
-    await repoCallbackAdded(node);
+    await repoCallbacksAdded(node);
 
     node.set({ a: 1, b: 2, c: 3 });
     expect(added).to.equal('b c ');
@@ -1092,7 +1090,7 @@ describe('Query Tests', function() {
     node.limitToLast(2).on('child_removed', function(snap) {
       removed += snap.key + ' ';
     });
-    await repoCallbackAdded(node);
+    await repoCallbacksAdded(node);
     node.set({ b: 2, c: 3 });
     expect(added).to.equal('b c ');
     expect(removed).to.equal('');
@@ -1312,7 +1310,7 @@ describe('Query Tests', function() {
     node.limitToLast(2).on('child_added', function(snap, prevName) {
       added += snap.key + ' ' + prevName + ', ';
     });
-    await repoCallbackAdded(node);
+    await repoCallbacksAdded(node);
 
     node.child('a').set(1);
     expect(added).to.equal('a null, ');
@@ -1368,7 +1366,7 @@ describe('Query Tests', function() {
     node.limitToLast(2).on('child_moved', function(snap, prevName) {
       moved += snap.key + ' ' + prevName + ', ';
     });
-    await repoCallbackAdded(node);
+    await repoCallbacksAdded(node);
 
     node.child('a').setWithPriority('a', 10);
     node.child('b').setWithPriority('b', 20);
@@ -1423,7 +1421,7 @@ describe('Query Tests', function() {
     node.limitToLast(2).on('child_moved', function(snap, prevName) {
       moved += snap.key + ' ' + prevName + ', ';
     });
-    await repoCallbackAdded(node);
+    await repoCallbacksAdded(node);
 
     node.child('a').setWithPriority('a', 1);
     node.child('b').setWithPriority('b', 2);
@@ -1465,7 +1463,7 @@ describe('Query Tests', function() {
     node.limitToLast(2).on('child_removed', function(snap) {
       eventHistory = eventHistory + snap.val() + ' removed, ';
     });
-    await repoCallbackAdded(node);
+    await repoCallbacksAdded(node);
 
     for (let i = 0; i < 5; i++) {
       const n = node.push();
@@ -1600,7 +1598,7 @@ describe('Query Tests', function() {
   });
 
   async function dumpListens(node: Query) {
-    await node.repo.eventCallbacksAdded_;
+    await repoCallbacksAdded(node);
 
     const listens = (node.repo.persistentConnection_ as any).listens_;
     const nodePath = getPath(node);
@@ -1766,7 +1764,7 @@ describe('Query Tests', function() {
     node.limitToLast(5).on('child_added', function(childSnap) {
       children.push(childSnap.key);
     });
-    await repoCallbackAdded(node);
+    await repoCallbacksAdded(node);
 
     node.set({
       Vikrum: { '.priority': 1000, score: 1000, name: 'Vikrum' },
@@ -1816,7 +1814,7 @@ describe('Query Tests', function() {
 
     const l = new ListenerDoohickey();
     ref.on('value', l.onEvent, l);
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.set('test');
     expect(l.snap.val()).to.equal('test');
@@ -1840,7 +1838,7 @@ describe('Query Tests', function() {
 
     const l = new ListenerDoohickey();
     ref.once('value', l.onEvent, l);
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.set('test');
     expect(l.snap.val()).to.equal('test');
@@ -1857,7 +1855,7 @@ describe('Query Tests', function() {
     ref.limitToLast(2).on('value', function(snap) {
       snaps.push(snap.val());
     });
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.set({
       a: { '.value': 1, '.priority': 1 },
@@ -1888,7 +1886,7 @@ describe('Query Tests', function() {
       child = snap.val();
     });
 
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.set({ a: 1, b: 2 });
     expect(parent).to.deep.equal({ b: 2 });
@@ -1912,7 +1910,7 @@ describe('Query Tests', function() {
       child = snap.val();
     });
 
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.set({ a: 1 });
     expect(parent).to.deep.equal({ a: 1 });
@@ -1944,7 +1942,7 @@ describe('Query Tests', function() {
         d = snap.val();
       });
 
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.set({ a: 1, b: 2, c: 3 });
     expect(c).to.deep.equal({ c: 3 });
@@ -1964,7 +1962,7 @@ describe('Query Tests', function() {
       ea.addEvent();
     });
 
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.set({ a: 1, b: 2 });
     expect(val).to.equal(2);
@@ -2588,7 +2586,7 @@ describe('Query Tests', function() {
         removedSecond.push(snap.key);
       });
 
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     ref.child('a').setWithPriority('a', 5);
     expect(addedFirst).to.deep.equal(['a']);
@@ -2980,7 +2978,7 @@ describe('Query Tests', function() {
       events.push(s.val());
     });
 
-    await repoCallbackAdded(ref);
+    await repoCallbacksAdded(ref);
 
     // If you change this to ref.push('foo') it works.
     ref.push({ a: 'foo' });

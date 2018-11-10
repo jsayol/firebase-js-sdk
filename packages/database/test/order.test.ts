@@ -15,7 +15,7 @@
  */
 
 import { expect } from 'chai';
-import { getRandomNode } from './helpers/util';
+import { getRandomNode, repoCallbacksAdded } from './helpers/util';
 import { Reference } from '../src/api/Reference';
 import { EventAccumulator } from './helpers/EventAccumulator';
 import { eventTestHelper } from './helpers/events';
@@ -272,13 +272,14 @@ describe('Order Tests', function() {
     expect((await node.once('value')).child('b').getPriority()).to.equal(null);
   });
 
-  it('Inserting a node under a leaf node preserves its priority.', function() {
+  it('Inserting a node under a leaf node preserves its priority.', async function() {
     const node = getRandomNode();
 
     let snap = null;
     node.on('value', function(s) {
       snap = s;
     });
+    await repoCallbacksAdded(node);
 
     node.setWithPriority('a', 10);
     node.child('deeper').set('deeper');
@@ -382,26 +383,28 @@ describe('Order Tests', function() {
     expect(output).to.equal(expectedOutput);
   });
 
-  it('Ensure prevName is correct on child_added event.', function() {
+  it('Ensure prevName is correct on child_added event.', async function() {
     const node = getRandomNode();
 
     let added = '';
     node.on('child_added', function(snap, prevName) {
       added += snap.key + ' ' + prevName + ', ';
     });
+    await repoCallbacksAdded(node);
 
     node.set({ a: 1, b: 2, c: 3 });
 
     expect(added).to.equal('a null, b a, c b, ');
   });
 
-  it('Ensure prevName is correct when adding new nodes.', function() {
+  it('Ensure prevName is correct when adding new nodes.', async function() {
     const node = getRandomNode();
 
     let added = '';
     node.on('child_added', function(snap, prevName) {
       added += snap.key + ' ' + prevName + ', ';
     });
+    await repoCallbacksAdded(node);
 
     node.set({ b: 2, c: 3, d: 4 });
 
@@ -416,13 +419,14 @@ describe('Order Tests', function() {
     expect(added).to.equal('e d, ');
   });
 
-  it('Ensure prevName is correct when adding new nodes with JSON.', function() {
+  it('Ensure prevName is correct when adding new nodes with JSON.', async function() {
     const node = getRandomNode();
 
     let added = '';
     node.on('child_added', function(snap, prevName) {
       added += snap.key + ' ' + prevName + ', ';
     });
+    await repoCallbacksAdded(node);
 
     node.set({ b: 2, c: 3, d: 4 });
 
@@ -437,13 +441,14 @@ describe('Order Tests', function() {
     expect(added).to.equal('e d, ');
   });
 
-  it('Ensure prevName is correct when moving nodes.', function() {
+  it('Ensure prevName is correct when moving nodes.', async function() {
     const node = getRandomNode();
 
     let moved = '';
     node.on('child_moved', function(snap, prevName) {
       moved += snap.key + ' ' + prevName + ', ';
     });
+    await repoCallbacksAdded(node);
 
     node.child('a').setWithPriority('a', 1);
     node.child('b').setWithPriority('b', 2);
@@ -462,13 +467,14 @@ describe('Order Tests', function() {
     expect(moved).to.equal('c d, ');
   });
 
-  it('Ensure prevName is correct when moving nodes by setting whole JSON.', function() {
+  it('Ensure prevName is correct when moving nodes by setting whole JSON.', async function() {
     const node = getRandomNode();
 
     let moved = '';
     node.on('child_moved', function(snap, prevName) {
       moved += snap.key + ' ' + prevName + ', ';
     });
+    await repoCallbacksAdded(node);
 
     node.set({
       a: { '.value': 'a', '.priority': 1 },
@@ -519,38 +525,41 @@ describe('Order Tests', function() {
     expect(moves).to.equal(0, 'Should *not* have received any move events.');
   });
 
-  it('Can set value with priority of 0.', function() {
+  it('Can set value with priority of 0.', async function() {
     const f = getRandomNode();
 
     let snap = null;
     f.on('value', function(s) {
       snap = s;
     });
+    await repoCallbacksAdded(f);
 
     f.setWithPriority('test', 0);
 
     expect(snap.getPriority()).to.equal(0);
   });
 
-  it('Can set object with priority of 0.', function() {
+  it('Can set object with priority of 0.', async function() {
     const f = getRandomNode();
 
     let snap = null;
     f.on('value', function(s) {
       snap = s;
     });
+    await repoCallbacksAdded(f);
 
     f.setWithPriority({ x: 'test', y: 7 }, 0);
 
     expect(snap.getPriority()).to.equal(0);
   });
 
-  it('Case 2003: Should get child_moved for any priority change, regardless of whether it affects ordering.', function() {
+  it('Case 2003: Should get child_moved for any priority change, regardless of whether it affects ordering.', async function() {
     const f = getRandomNode();
     const moved = [];
     f.on('child_moved', function(snap) {
       moved.push(snap.key);
     });
+    await repoCallbacksAdded(f);
     f.set({
       a: { '.value': 'a', '.priority': 0 },
       b: { '.value': 'b', '.priority': 1 },
@@ -563,12 +572,13 @@ describe('Order Tests', function() {
     expect(moved).to.deep.equal(['b']);
   });
 
-  it('Case 2003: Should get child_moved for any priority change, regardless of whether it affects ordering (2).', function() {
+  it('Case 2003: Should get child_moved for any priority change, regardless of whether it affects ordering (2).', async function() {
     const f = getRandomNode();
     const moved = [];
     f.on('child_moved', function(snap) {
       moved.push(snap.key);
     });
+    await repoCallbacksAdded(f);
     f.set({
       a: { '.value': 'a', '.priority': 0 },
       b: { '.value': 'b', '.priority': 1 },

@@ -21,7 +21,7 @@ import '../../index';
 import { Reference } from '../../src/api/Reference';
 import { Query } from '../../src/api/Query';
 import { ConnectionTarget } from '../../src/api/test_access';
-import { RepoInfo } from '../../src/core/RepoInfo';
+import { DataSnapshot } from '../../src/api/DataSnapshot';
 
 export const TEST_PROJECT = require('../../../../config/project.json');
 
@@ -206,17 +206,18 @@ export function getFreshRepoFromReference(ref) {
 }
 
 // Little helpers to get the currently cached snapshot / value.
-export function getSnap(path) {
+export async function getSnap(path: Reference): Promise<DataSnapshot> {
   let snap;
   const callback = function(snapshot) {
     snap = snapshot;
   };
+  await repoCallbacksAdded(path);
   path.once('value', callback);
   return snap;
 }
 
-export function getVal(path) {
-  const snap = getSnap(path);
+export async function getVal(path) {
+  const snap = await getSnap(path);
   return snap ? snap.val() : undefined;
 }
 
@@ -244,4 +245,8 @@ export function testRepoInfo(url) {
   if (!match) throw new Error('Couldnt get Namespace from passed URL');
   const [, ns] = match;
   return new ConnectionTarget(`${ns}.firebaseio.com`, true, ns, false);
+}
+
+export function repoCallbacksAdded(node: Query): Promise<void> {
+  return node.repo.eventCallbackAddQueue_;
 }

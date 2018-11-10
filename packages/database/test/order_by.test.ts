@@ -15,7 +15,7 @@
  */
 
 import { expect } from 'chai';
-import { getRandomNode } from './helpers/util';
+import { getRandomNode, repoCallbacksAdded } from './helpers/util';
 import { EventAccumulatorFactory } from './helpers/EventAccumulator';
 import { Reference } from '../src/api/Reference';
 
@@ -24,7 +24,7 @@ describe('.orderBy tests', function() {
 
   const clearRef = getRandomNode();
 
-  it('Snapshots are iterated in order', function() {
+  it('Snapshots are iterated in order', async function() {
     const ref = getRandomNode();
 
     const initial = {
@@ -55,6 +55,8 @@ describe('.orderBy tests', function() {
       addedPrevNames.push(prevName);
     });
 
+    await repoCallbacksAdded(ref);
+
     ref.set(initial);
 
     expect(addedOrder).to.deep.equal(expectedOrder);
@@ -62,7 +64,7 @@ describe('.orderBy tests', function() {
     expect(addedPrevNames).to.deep.equal(expectedPrevNames);
   });
 
-  it('Snapshots are iterated in order for value', function() {
+  it('Snapshots are iterated in order for value', async function() {
     const ref = getRandomNode();
 
     const initial = {
@@ -93,6 +95,8 @@ describe('.orderBy tests', function() {
       addedPrevNames.push(prevName);
     });
 
+    await repoCallbacksAdded(ref);
+
     ref.set(initial);
 
     expect(addedOrder).to.deep.equal(expectedOrder);
@@ -100,7 +104,7 @@ describe('.orderBy tests', function() {
     expect(addedPrevNames).to.deep.equal(expectedPrevNames);
   });
 
-  it('Fires child_moved events', function() {
+  it('Fires child_moved events', async function() {
     const ref = getRandomNode();
 
     const initial = {
@@ -120,6 +124,7 @@ describe('.orderBy tests', function() {
       expect(prevName).to.equal('rob');
       expect(snap.val()).to.deep.equal({ nuggets: 57 });
     });
+    await repoCallbacksAdded(ref);
 
     ref.set(initial);
     ref.child('greg/nuggets').set(57);
@@ -175,7 +180,7 @@ describe('.orderBy tests', function() {
     expect(reads).to.equal(12);
   });
 
-  it('child_added events are in the correct order', function() {
+  it('child_added events are in the correct order', async function() {
     const ref = getRandomNode();
 
     const initial = {
@@ -187,6 +192,7 @@ describe('.orderBy tests', function() {
     ref.orderByChild('value').on('child_added', function(snap) {
       added.push(snap.key);
     });
+    await repoCallbacksAdded(ref);
     ref.set(initial);
 
     expect(added).to.deep.equal(['c', 'a']);
@@ -322,7 +328,7 @@ describe('.orderBy tests', function() {
     });
   });
 
-  it('startAt/endAt works on value index', function() {
+  it('startAt/endAt works on value index', async function() {
     const ref = getRandomNode();
 
     const initial = {
@@ -355,6 +361,8 @@ describe('.orderBy tests', function() {
       addedOrder.push(snap.key);
       addedPrevNames.push(prevName);
     });
+
+    await repoCallbacksAdded(ref);
 
     ref.set(initial);
 

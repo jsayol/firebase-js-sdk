@@ -89,14 +89,14 @@ export class Repo {
   private persistenceManager_: PersistenceManager;
 
   /**
-   * A promise used as a way to signal that any pending new event callbacks
-   * have been registered.
+   * A promise used as a queue to ensure that any new event callbacks are
+   * registered only after any pending ones have been registered.
    *
    * TODO(jsayol): This should be @private but it's used by query.test.ts
    *
    * @type {Promise.<void>}
    */
-  eventCallbacksAdded_ = Promise.resolve();
+  eventCallbackAddQueue_ = Promise.resolve();
 
   /**
    * @param {!RepoInfo} repoInfo_
@@ -614,7 +614,7 @@ export class Repo {
    * @param {!EventRegistration} eventRegistration
    */
   addEventCallbackForQuery(query: Query, eventRegistration: EventRegistration) {
-    this.eventCallbacksAdded_ = this.eventCallbacksAdded_
+    this.eventCallbackAddQueue_ = this.eventCallbackAddQueue_
       .catch(() => void 0)
       .then(() => {
         const syncTree =
