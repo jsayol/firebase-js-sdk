@@ -53,7 +53,7 @@ let tokenListeners: any[] = [];
  * Global context object for a collection of services using
  * a shared authentication state.
  */
-class FirebaseAppImpl implements FirebaseApp {
+export class FirebaseAppImpl implements FirebaseApp {
   private options_: FirebaseOptions;
   private name_: string;
   private isDeleted_ = false;
