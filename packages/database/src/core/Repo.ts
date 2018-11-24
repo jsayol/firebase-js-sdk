@@ -89,16 +89,6 @@ export class Repo {
   private persistenceManager_: PersistenceManager;
 
   /**
-   * A promise used as a queue to ensure that any new event callbacks are
-   * registered only after any pending ones have been registered.
-   *
-   * TODO(jsayol): This should be @private but it's used by query.test.ts
-   *
-   * @type {Promise.<void>}
-   */
-  eventCallbackAddQueue_ = Promise.resolve();
-
-  /**
    * @param {!RepoInfo} repoInfo_
    * @param {boolean} forceRestClient
    * @param {!FirebaseApp} app
@@ -614,20 +604,26 @@ export class Repo {
    * @param {!EventRegistration} eventRegistration
    */
   addEventCallbackForQuery(query: Query, eventRegistration: EventRegistration) {
-    this.eventCallbackAddQueue_ = this.eventCallbackAddQueue_
-      .catch(() => void 0)
-      .then(() => {
-        const syncTree =
-          query.path.getFront() === '.info'
-            ? this.infoSyncTree_
-            : this.serverSyncTree_;
+    const syncTree =
+      query.path.getFront() === '.info'
+        ? this.infoSyncTree_
+        : this.serverSyncTree_;
 
-        return syncTree
-          .addEventRegistration(query, eventRegistration)
-          .then((events: Event[]) => {
-            this.eventQueue_.raiseEventsAtPath(query.path, events);
-          });
+    const { events, asyncEvents } = syncTree.addEventRegistration(
+      query,
+      eventRegistration
+    );
+
+    this.eventQueue_.raiseEventsAtPath(query.path, events);
+
+    if (asyncEvents) {
+      asyncEvents.then((events: Event[]) => {
+        // FIXME(jsayol): possible race condition. What happens if we get an update
+        // from the server before this promise has resolved? We might be raising
+        // events for stale persisted data here.
+        this.eventQueue_.raiseEventsAtPath(query.path, events);
       });
+    }
   }
 
   /**

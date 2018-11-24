@@ -20,8 +20,7 @@ import {
   canCreateExtraConnections,
   getFreshRepoFromReference,
   getRandomNode,
-  getVal,
-  repoCallbacksAdded
+  getVal
 } from './helpers/util';
 import { eventTestHelper } from './helpers/events';
 import {
@@ -47,7 +46,7 @@ describe('Transaction Tests', function() {
     }
   });
 
-  it('New value is immediately visible.', async function() {
+  it('New value is immediately visible.', function() {
     const node = getRandomNode();
     node.child('foo').transaction(function() {
       return 42;
@@ -57,11 +56,10 @@ describe('Transaction Tests', function() {
     node.child('foo').on('value', function(snap) {
       val = snap.val();
     });
-    await repoCallbacksAdded(node);
     expect(val).to.equal(42);
   });
 
-  it('Event is raised for new value.', async function() {
+  it('Event is raised for new value.', function() {
     const node = getRandomNode();
     const fooNode = node.child('foo');
     const eventHelper = eventTestHelper([[fooNode, ['value', '']]]);
@@ -69,8 +67,6 @@ describe('Transaction Tests', function() {
     node.child('foo').transaction(function() {
       return 42;
     });
-
-    await repoCallbacksAdded(node);
 
     expect(eventHelper.waiter()).to.equal(true);
   });
@@ -236,14 +232,14 @@ describe('Transaction Tests', function() {
     return ea.promise;
   });
 
-  it('Second transaction gets run immediately on previous output and only runs once.', async function(done) {
+  it('Second transaction gets run immediately on previous output and only runs once.', function(done) {
     const nodePair = getRandomNode(2) as Reference[];
     let firstRun = false,
       firstDone = false,
       secondRun = false,
       secondDone = false;
 
-      function onComplete() {
+    function onComplete() {
       if (firstDone && secondDone) {
         nodePair[1].on('value', function(snap) {
           expect(snap.val()).to.equal(84);
@@ -253,8 +249,7 @@ describe('Transaction Tests', function() {
     }
 
     nodePair[0].transaction(
-      function(x) {
-        console.log('firstRun', firstRun, x);
+      function() {
         expect(firstRun).to.equal(false);
         firstRun = true;
         return 42;
@@ -270,7 +265,6 @@ describe('Transaction Tests', function() {
 
     nodePair[0].transaction(
       function(value) {
-        console.log('secondRun', secondRun, value);
         expect(secondRun).to.equal(false);
         secondRun = true;
         expect(value).to.equal(42);
@@ -285,7 +279,7 @@ describe('Transaction Tests', function() {
     );
     expect(secondRun).to.equal(true);
 
-    expect(await getVal(nodePair[0])).to.equal(84);
+    expect(getVal(nodePair[0])).to.equal(84);
   });
 
   it('Set() cancels pending transactions and re-runs affected transactions.', async function() {
@@ -310,7 +304,6 @@ describe('Transaction Tests', function() {
       const str = JSON.stringify(s.val());
       nodeFooSnap = s;
     });
-    await repoCallbacksAdded(node);
 
     let firstRun = false,
       secondRun = false,
@@ -412,7 +405,6 @@ describe('Transaction Tests', function() {
     node.on('value', function(s) {
       snap = s;
     });
-    await repoCallbacksAdded(node);
     node.setWithPriority('test', 5);
     expect(snap.getPriority()).to.equal(5);
 

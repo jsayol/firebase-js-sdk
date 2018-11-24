@@ -61,7 +61,7 @@ export class SyncPoint {
   /**
    * @param {!PersistenceManager} persistenceManager_
    */
-  constructor(private persistenceManager_: PersistenceManager) {}
+  constructor(private persistenceManager_: PersistenceManager | undefined) {}
 
   /**
    * The Views being tracked at this location in the tree, stored as a map where the key is a

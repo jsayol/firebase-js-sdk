@@ -103,7 +103,7 @@ export class SyncTree {
   /**
    * Persistence manager
    */
-  private persistenceManager_: PersistenceManager;
+  private persistenceManager_: PersistenceManager | undefined;
 
   /**
    * @param {!ListenProvider} listenProvider_ Used by SyncTree to start / stop listening
@@ -391,12 +391,12 @@ export class SyncTree {
    *
    * @param {!Query} query
    * @param {!EventRegistration} eventRegistration
-   * @return {!Promise.<Array.<!Event>>} Promise that resolves to the events to raise.
+   * @return {{!events: {!Array.<!Event>}, asyncEvents: {!Promise.<!Array.<!Event>}}} Events to raise.
    */
   addEventRegistration(
     query: Query,
     eventRegistration: EventRegistration
-  ): Promise<Event[]> {
+  ): { events: Event[]; asyncEvents?: Promise<Event[]> } {
     const path = query.path;
 
     let serverCache: Node | null = null;
@@ -425,17 +425,30 @@ export class SyncTree {
       serverCache = serverCache || syncPoint.getCompleteServerCache(Path.Empty);
     }
 
-    if (this.persistenceManager_ !== void 0) {
-      this.persistenceManager_.setQueryActive(query);
+    let serverCacheComplete;
+    if (serverCache != null) {
+      serverCacheComplete = true;
+    } else {
+      serverCacheComplete = false;
+      serverCache = ChildrenNode.EMPTY_NODE;
+      const subtree = this.syncPointTree_.subtree(path);
+      subtree.foreachChild(function(childName, childSyncPoint) {
+        const completeCache = childSyncPoint.getCompleteServerCache(Path.Empty);
+        if (completeCache) {
+          serverCache = serverCache.updateImmediateChild(
+            childName,
+            completeCache
+          );
+        }
+      });
     }
 
     const viewAlreadyExists = syncPoint.viewExistsForQuery(query);
-
     if (!viewAlreadyExists && !query.getQueryParams().loadsAllData()) {
       // We need to track a tag for this query
       const queryKey = SyncTree.makeQueryKey_(query);
       assert(
-        !contains(this.queryToTagMap_, queryKey),
+        !(queryKey in this.queryToTagMap_),
         'View does not exist, but we have a tag'
       );
       const tag = SyncTree.getNextQueryTag_();
@@ -444,69 +457,40 @@ export class SyncTree {
       this.tagToQueryMap_['_' + tag] = query;
     }
 
-    let eventsPromise: Promise<Event[]>;
     const writesCache = this.pendingWriteTree_.childWrites(path);
+    let events = syncPoint.addEventRegistration(
+      query,
+      eventRegistration,
+      writesCache,
+      serverCache,
+      serverCacheComplete
+    );
 
-    if (serverCache !== null) {
-      // We already found a complete server cache in memory
-      const events = syncPoint.addEventRegistration(
-        query,
-        eventRegistration,
-        writesCache,
-        serverCache,
-        true
-      );
-      eventsPromise = Promise.resolve(events);
-    } else {
-      if (this.persistenceManager_ !== void 0) {
-        // Get the server cache from persistence
-        eventsPromise = this.persistenceManager_
-          .getServerCache(query)
-          .then((cacheNode: CacheNode) => {
-            return syncPoint.addEventRegistration(
-              query,
-              eventRegistration,
-              writesCache,
-              cacheNode.getNode(),
-              cacheNode.isFullyInitialized()
-            );
-          });
-      } else {
-        // No complete server cache in memory, and persistence disabled
-        serverCache = ChildrenNode.EMPTY_NODE as Node;
-
-        const subtree = this.syncPointTree_.subtree(path);
-        subtree.foreachChild((childName, childSyncPoint) => {
-          const completeCache = childSyncPoint.getCompleteServerCache(
-            Path.Empty
-          );
-          if (completeCache) {
-            serverCache = serverCache.updateImmediateChild(
-              childName,
-              completeCache
-            );
-          }
-        });
-
-        const events = syncPoint.addEventRegistration(
-          query,
-          eventRegistration,
-          writesCache,
-          serverCache,
-          false
-        );
-        eventsPromise = Promise.resolve(events);
-      }
+    if (!viewAlreadyExists && !foundAncestorDefaultView) {
+      const view /** @type !View */ = syncPoint.viewForQuery(query);
+      events = events.concat(this.setupListener_(query, view));
     }
 
-    return eventsPromise.then((events: Event[]) => {
-      if (!viewAlreadyExists && !foundAncestorDefaultView) {
-        // There was no view and no default listen
-        const view = syncPoint.viewForQuery(query);
-        events = [...events, ...this.setupListener_(query, view)];
-      }
-      return events;
-    });
+    let asyncEvents: Promise<Event[]>;
+
+    if (serverCache !== null && this.persistenceManager_ !== void 0) {
+      // We didn't find a complete server cache in memory, so we try to get
+      // the server cache from persistence. If data is found, any relevant
+      // events will be raised asynchronously, not immediately.
+      asyncEvents = this.persistenceManager_
+        .getServerCache(query)
+        .then((cacheNode: CacheNode) =>
+          syncPoint.addEventRegistration(
+            query,
+            eventRegistration,
+            writesCache,
+            cacheNode.getNode(),
+            cacheNode.isFullyInitialized()
+          )
+        );
+    }
+
+    return { events, asyncEvents };
   }
 
   /**

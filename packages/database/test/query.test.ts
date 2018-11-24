@@ -18,7 +18,7 @@ import { expect } from 'chai';
 import { Reference } from '../src/api/Reference';
 import { Query } from '../src/api/Query';
 import '../src/core/snap/ChildrenNode';
-import { getRandomNode, getPath, pause, repoCallbacksAdded } from './helpers/util';
+import { getRandomNode, getPath, pause } from './helpers/util';
 import {
   EventAccumulator,
   EventAccumulatorFactory
@@ -443,7 +443,7 @@ describe('Query Tests', function() {
     ).to.be.false;
   });
 
-  it('Query.off can be called on the default query.', async function() {
+  it('Query.off can be called on the default query.', function() {
     const path = getRandomNode();
     let eventFired = false;
 
@@ -451,7 +451,6 @@ describe('Query Tests', function() {
       eventFired = true;
     };
     path.limitToLast(5).on('value', callback);
-    await repoCallbacksAdded(path);
 
     path.set({ a: 5, b: 6 });
     expect(eventFired).to.be.true;
@@ -462,7 +461,7 @@ describe('Query Tests', function() {
     expect(eventFired).to.be.false;
   });
 
-  it('Query.off can be called on the specific query.', async function() {
+  it('Query.off can be called on the specific query.', function() {
     const path = getRandomNode();
     let eventFired = false;
 
@@ -470,7 +469,6 @@ describe('Query Tests', function() {
       eventFired = true;
     };
     path.limitToLast(5).on('value', callback);
-    await repoCallbacksAdded(path);
 
     path.set({ a: 5, b: 6 });
     expect(eventFired).to.be.true;
@@ -481,7 +479,7 @@ describe('Query Tests', function() {
     expect(eventFired).to.be.false;
   });
 
-  it('Query.off can be called without a callback specified.', async function() {
+  it('Query.off can be called without a callback specified.', function() {
     const path = getRandomNode();
     let eventFired = false;
 
@@ -493,7 +491,6 @@ describe('Query Tests', function() {
     };
     path.on('value', callback1);
     path.limitToLast(5).on('value', callback2);
-    await repoCallbacksAdded(path);
 
     path.set({ a: 5, b: 6 });
     expect(eventFired).to.be.true;
@@ -504,7 +501,7 @@ describe('Query Tests', function() {
     expect(eventFired).to.be.false;
   });
 
-  it('Query.off can be called without an event type or callback specified.', async function() {
+  it('Query.off can be called without an event type or callback specified.', function() {
     const path = getRandomNode();
     let eventFired = false;
 
@@ -516,7 +513,6 @@ describe('Query Tests', function() {
     };
     path.on('value', callback1);
     path.limitToLast(5).on('value', callback2);
-    await repoCallbacksAdded(path);
 
     path.set({ a: 5, b: 6 });
     expect(eventFired).to.be.true;
@@ -527,7 +523,7 @@ describe('Query Tests', function() {
     expect(eventFired).to.be.false;
   });
 
-  it('Query.off respects provided context (for value events).', async function() {
+  it('Query.off respects provided context (for value events).', function() {
     const ref = getRandomNode();
 
     const a = new EventReceiver(),
@@ -535,7 +531,6 @@ describe('Query Tests', function() {
 
     ref.on('value', a.onValue, a);
     ref.on('value', b.onValue, b);
-    await repoCallbacksAdded(ref);
 
     ref.set('hello!');
     expect(a.gotValue).to.be.true;
@@ -553,7 +548,7 @@ describe('Query Tests', function() {
     ref.off('value', a.onValue, a);
   });
 
-  it('Query.off respects provided context (for child events).', async function() {
+  it('Query.off respects provided context (for child events).', function() {
     const ref = getRandomNode();
 
     const a = new EventReceiver(),
@@ -561,7 +556,6 @@ describe('Query Tests', function() {
 
     ref.on('child_added', a.onChildAdded, a);
     ref.on('child_added', b.onChildAdded, b);
-    await repoCallbacksAdded(ref);
 
     ref.push('hello!');
     expect(a.gotChildAdded).to.be.true;
@@ -579,7 +573,7 @@ describe('Query Tests', function() {
     ref.off('child_added', a.onChildAdded, a);
   });
 
-  it('Query.off with no callback/context removes all callbacks, even with contexts (for value events).', async function() {
+  it('Query.off with no callback/context removes all callbacks, even with contexts (for value events).', function() {
     const ref = getRandomNode();
 
     const a = new EventReceiver(),
@@ -587,7 +581,6 @@ describe('Query Tests', function() {
 
     ref.on('value', a.onValue, a);
     ref.on('value', b.onValue, b);
-    await repoCallbacksAdded(ref);
 
     ref.set('hello!');
     expect(a.gotValue).to.be.true;
@@ -603,7 +596,7 @@ describe('Query Tests', function() {
     expect(b.gotValue).to.be.false;
   });
 
-  it('Query.off with no callback/context removes all callbacks, even with contexts (for child events).', async function() {
+  it('Query.off with no callback/context removes all callbacks, even with contexts (for child events).', function() {
     const ref = getRandomNode();
 
     const a = new EventReceiver(),
@@ -611,7 +604,6 @@ describe('Query Tests', function() {
 
     ref.on('child_added', a.onChildAdded, a);
     ref.on('child_added', b.onChildAdded, b);
-    await repoCallbacksAdded(ref);
 
     ref.push('hello!');
     expect(a.gotChildAdded).to.be.true;
@@ -627,7 +619,7 @@ describe('Query Tests', function() {
     expect(b.gotChildAdded).to.be.false;
   });
 
-  it('Query.off with no event type / callback removes all callbacks (even those with contexts).', async function() {
+  it('Query.off with no event type / callback removes all callbacks (even those with contexts).', function() {
     const ref = getRandomNode();
 
     const a = new EventReceiver(),
@@ -637,7 +629,6 @@ describe('Query Tests', function() {
     ref.on('value', b.onValue, b);
     ref.on('child_added', a.onChildAdded, a);
     ref.on('child_added', b.onChildAdded, b);
-    await repoCallbacksAdded(ref);
 
     ref.set(null);
     ref.push('hello!');
@@ -658,13 +649,12 @@ describe('Query Tests', function() {
     expect(b.gotValue).to.be.false;
   });
 
-  it('Set a limit of 5, add a bunch of nodes, ensure only last 5 items are kept.', async function() {
+  it('Set a limit of 5, add a bunch of nodes, ensure only last 5 items are kept.', function() {
     const node = getRandomNode();
     let snap = null;
     node.limitToLast(5).on('value', function(s) {
       snap = s;
     });
-    await repoCallbacksAdded(node);
 
     node.set({});
     for (let i = 0; i < 10; i++) {
@@ -842,7 +832,7 @@ describe('Query Tests', function() {
     );
   });
 
-  it('Set limit, ensure child_removed and child_added events are fired when limit is hit.', async function() {
+  it('Set limit, ensure child_removed and child_added events are fired when limit is hit.', function() {
     const node = getRandomNode();
     let added = '',
       removed = '';
@@ -852,8 +842,6 @@ describe('Query Tests', function() {
     node.limitToLast(2).on('child_removed', function(snap) {
       removed += snap.key + ' ';
     });
-    await repoCallbacksAdded(node);
-
     node.set({ a: 1, b: 2, c: 3 });
 
     expect(added).to.equal('b c ');
@@ -894,7 +882,7 @@ describe('Query Tests', function() {
     expect(removed).to.equal('b ');
   });
 
-  it('Set start and limit, ensure child_removed and child_added events are fired when limit is hit.', async function() {
+  it('Set start and limit, ensure child_removed and child_added events are fired when limit is hit.', function() {
     const node = getRandomNode();
 
     let added = '',
@@ -911,8 +899,6 @@ describe('Query Tests', function() {
       .on('child_removed', function(snap) {
         removed += snap.key + ' ';
       });
-    await repoCallbacksAdded(node);
-
     node.set({ a: 1, b: 2, c: 3 });
     expect(added).to.equal('a b ');
     expect(removed).to.equal('');
@@ -924,7 +910,7 @@ describe('Query Tests', function() {
   });
 
   it('Set start and limit, ensure child_removed and child_added events are fired when limit is hit, using server data', async function() {
-    const node = <Reference>getRandomNode();
+    const node = getRandomNode();
 
     await node.set({ a: 1, b: 2, c: 3 });
     const ea = EventAccumulatorFactory.waitsForCount(2);
@@ -957,7 +943,7 @@ describe('Query Tests', function() {
     expect(removed).to.equal('b ');
   });
 
-  it("Set start and limit, ensure child_added events are fired when limit isn't hit yet.", async function() {
+  it("Set start and limit, ensure child_added events are fired when limit isn't hit yet.", function() {
     const node = getRandomNode();
 
     let added = '',
@@ -974,8 +960,6 @@ describe('Query Tests', function() {
       .on('child_removed', function(snap) {
         removed += snap.key + ' ';
       });
-    await repoCallbacksAdded(node);
-
     node.set({ c: 3 });
     expect(added).to.equal('c ');
     expect(removed).to.equal('');
@@ -1034,8 +1018,6 @@ describe('Query Tests', function() {
     node.limitToLast(2).on('child_removed', function(snap) {
       removed += snap.key + ' ';
     });
-    await repoCallbacksAdded(node);
-
     node.set({ a: 1, b: 2, c: 3 });
     expect(added).to.equal('b c ');
     expect(removed).to.equal('');
@@ -1079,7 +1061,7 @@ describe('Query Tests', function() {
     expect(added).to.equal('a ');
   });
 
-  it('Set a limit, ensure child_removed events are fired when limit is satisfied, you remove an item, and there are no more.', async function() {
+  it('Set a limit, ensure child_removed events are fired when limit is satisfied, you remove an item, and there are no more.', function() {
     const node = getRandomNode();
 
     let added = '',
@@ -1090,7 +1072,6 @@ describe('Query Tests', function() {
     node.limitToLast(2).on('child_removed', function(snap) {
       removed += snap.key + ' ';
     });
-    await repoCallbacksAdded(node);
     node.set({ b: 2, c: 3 });
     expect(added).to.equal('b c ');
     expect(removed).to.equal('');
@@ -1303,14 +1284,13 @@ describe('Query Tests', function() {
     );
   });
 
-  it('Set a limit, add some nodes, ensure prevName works correctly.', async function() {
+  it('Set a limit, add some nodes, ensure prevName works correctly.', function() {
     const node = getRandomNode();
 
     let added = '';
     node.limitToLast(2).on('child_added', function(snap, prevName) {
       added += snap.key + ' ' + prevName + ', ';
     });
-    await repoCallbacksAdded(node);
 
     node.child('a').set(1);
     expect(added).to.equal('a null, ');
@@ -1360,13 +1340,12 @@ describe('Query Tests', function() {
     expect(added).to.equal('d c, ');
   });
 
-  it('Set a limit, move some nodes, ensure prevName works correctly.', async function() {
+  it('Set a limit, move some nodes, ensure prevName works correctly.', function() {
     const node = getRandomNode();
     let moved = '';
     node.limitToLast(2).on('child_moved', function(snap, prevName) {
       moved += snap.key + ' ' + prevName + ', ';
     });
-    await repoCallbacksAdded(node);
 
     node.child('a').setWithPriority('a', 10);
     node.child('b').setWithPriority('b', 20);
@@ -1414,14 +1393,13 @@ describe('Query Tests', function() {
     expect(moved).to.equal('');
   });
 
-  it('Numeric priorities: Set a limit, move some nodes, ensure prevName works correctly.', async function() {
+  it('Numeric priorities: Set a limit, move some nodes, ensure prevName works correctly.', function() {
     const node = getRandomNode();
 
     let moved = '';
     node.limitToLast(2).on('child_moved', function(snap, prevName) {
       moved += snap.key + ' ' + prevName + ', ';
     });
-    await repoCallbacksAdded(node);
 
     node.child('a').setWithPriority('a', 1);
     node.child('b').setWithPriority('b', 2);
@@ -1452,7 +1430,7 @@ describe('Query Tests', function() {
     expect(moved).to.equal('c d, ');
   });
 
-  it('Set a limit, add a bunch of nodes, ensure local events are correct.', async function() {
+  it('Set a limit, add a bunch of nodes, ensure local events are correct.', function() {
     const node = getRandomNode();
     node.set({});
     let eventHistory = '';
@@ -1463,7 +1441,6 @@ describe('Query Tests', function() {
     node.limitToLast(2).on('child_removed', function(snap) {
       eventHistory = eventHistory + snap.val() + ' removed, ';
     });
-    await repoCallbacksAdded(node);
 
     for (let i = 0; i < 5; i++) {
       const n = node.push();
@@ -1597,9 +1574,7 @@ describe('Query Tests', function() {
     expect(val).to.deep.equal({ c: 2, d: 3, e: 4 });
   });
 
-  async function dumpListens(node: Query) {
-    await repoCallbacksAdded(node);
-
+  function dumpListens(node: Query) {
     const listens = (node.repo.persistentConnection_ as any).listens_;
     const nodePath = getPath(node);
     const listenPaths = [];
@@ -1627,87 +1602,83 @@ describe('Query Tests', function() {
     return dumpPieces.join(';');
   }
 
-  it('Dedupe listens: listen on parent.', async function() {
+  it('Dedupe listens: listen on parent.', function() {
     const node = getRandomNode();
-    expect(await dumpListens(node)).to.equal('');
+    expect(dumpListens(node)).to.equal('');
 
     const aOn = node.child('a').on('value', function() {});
-    expect(await dumpListens(node)).to.equal('/a:default');
+    expect(dumpListens(node)).to.equal('/a:default');
 
     const rootOn = node.on('value', function() {});
-    expect(await dumpListens(node)).to.equal(':default');
+    expect(dumpListens(node)).to.equal(':default');
 
     node.off('value', rootOn);
-    expect(await dumpListens(node)).to.equal('/a:default');
+    expect(dumpListens(node)).to.equal('/a:default');
 
     node.child('a').off('value', aOn);
-    expect(await dumpListens(node)).to.equal('');
+    expect(dumpListens(node)).to.equal('');
   });
 
-  it('Dedupe listens: listen on grandchild.', async function() {
+  it('Dedupe listens: listen on grandchild.', function() {
     const node = getRandomNode();
 
     const rootOn = node.on('value', function() {});
-    expect(await dumpListens(node)).to.equal(':default');
+    expect(dumpListens(node)).to.equal(':default');
 
     const aaOn = node.child('a/aa').on('value', function() {});
-    expect(await dumpListens(node)).to.equal(':default');
+    expect(dumpListens(node)).to.equal(':default');
 
     node.off('value', rootOn);
     node.child('a/aa').off('value', aaOn);
-    expect(await dumpListens(node)).to.equal('');
+    expect(dumpListens(node)).to.equal('');
   });
 
-  it('Dedupe listens: listen on grandparent of two children.', async function() {
+  it('Dedupe listens: listen on grandparent of two children.', function() {
     const node = getRandomNode();
-    expect(await dumpListens(node)).to.equal('');
+    expect(dumpListens(node)).to.equal('');
 
     const aaOn = node.child('a/aa').on('value', function() {});
-    expect(await dumpListens(node)).to.equal('/a/aa:default');
+    expect(dumpListens(node)).to.equal('/a/aa:default');
 
     const bbOn = node.child('a/bb').on('value', function() {});
-    expect(await dumpListens(node)).to.equal('/a/aa:default;/a/bb:default');
+    expect(dumpListens(node)).to.equal('/a/aa:default;/a/bb:default');
 
     const rootOn = node.on('value', function() {});
-    expect(await dumpListens(node)).to.equal(':default');
+    expect(dumpListens(node)).to.equal(':default');
 
     node.off('value', rootOn);
-    expect(await dumpListens(node)).to.equal('/a/aa:default;/a/bb:default');
+    expect(dumpListens(node)).to.equal('/a/aa:default;/a/bb:default');
 
     node.child('a/aa').off('value', aaOn);
-    expect(await dumpListens(node)).to.equal('/a/bb:default');
+    expect(dumpListens(node)).to.equal('/a/bb:default');
 
     node.child('a/bb').off('value', bbOn);
-    expect(await dumpListens(node)).to.equal('');
+    expect(dumpListens(node)).to.equal('');
   });
 
-  it('Dedupe queried listens: multiple queried listens; no dupes', async function() {
+  it('Dedupe queried listens: multiple queried listens; no dupes', function() {
     const node = getRandomNode();
-    expect(await dumpListens(node)).to.equal('');
+    expect(dumpListens(node)).to.equal('');
 
     const aLim1On = node
       .child('a')
       .limitToLast(1)
       .on('value', function() {});
-    expect(await dumpListens(node)).to.equal('/a:{"l":1,"vf":"r"}');
+    expect(dumpListens(node)).to.equal('/a:{"l":1,"vf":"r"}');
 
     const rootLim1On = node.limitToLast(1).on('value', function() {});
-    expect(await dumpListens(node)).to.equal(
-      ':{"l":1,"vf":"r"};/a:{"l":1,"vf":"r"}'
-    );
+    expect(dumpListens(node)).to.equal(':{"l":1,"vf":"r"};/a:{"l":1,"vf":"r"}');
 
     const aLim5On = node
       .child('a')
       .limitToLast(5)
       .on('value', function() {});
-    expect(await dumpListens(node)).to.equal(
+    expect(dumpListens(node)).to.equal(
       ':{"l":1,"vf":"r"};/a:{"l":1,"vf":"r"},{"l":5,"vf":"r"}'
     );
 
     node.limitToLast(1).off('value', rootLim1On);
-    expect(await dumpListens(node)).to.equal(
-      '/a:{"l":1,"vf":"r"},{"l":5,"vf":"r"}'
-    );
+    expect(dumpListens(node)).to.equal('/a:{"l":1,"vf":"r"},{"l":5,"vf":"r"}');
 
     node
       .child('a')
@@ -1717,54 +1688,53 @@ describe('Query Tests', function() {
       .child('a')
       .limitToLast(5)
       .off('value', aLim5On);
-    expect(await dumpListens(node)).to.equal('');
+    expect(dumpListens(node)).to.equal('');
   });
 
-  it('Dedupe queried listens: listen on parent of queried children.', async function() {
+  it('Dedupe queried listens: listen on parent of queried children.', function() {
     const node = getRandomNode();
 
     const aLim1On = node
       .child('a')
       .limitToLast(1)
       .on('value', function() {});
-    expect(await dumpListens(node)).to.equal('/a:{"l":1,"vf":"r"}');
+    expect(dumpListens(node)).to.equal('/a:{"l":1,"vf":"r"}');
 
     const bLim1On = node
       .child('b')
       .limitToLast(1)
       .on('value', function() {});
-    expect(await dumpListens(node)).to.equal(
+    expect(dumpListens(node)).to.equal(
       '/a:{"l":1,"vf":"r"};/b:{"l":1,"vf":"r"}'
     );
 
     const rootOn = node.on('value', function() {});
-    expect(await dumpListens(node)).to.equal(':default');
+    expect(dumpListens(node)).to.equal(':default');
 
     // remove in slightly random order.
     node
       .child('a')
       .limitToLast(1)
       .off('value', aLim1On);
-    expect(await dumpListens(node)).to.equal(':default');
+    expect(dumpListens(node)).to.equal(':default');
 
     node.off('value', rootOn);
-    expect(await dumpListens(node)).to.equal('/b:{"l":1,"vf":"r"}');
+    expect(dumpListens(node)).to.equal('/b:{"l":1,"vf":"r"}');
 
     node
       .child('b')
       .limitToLast(1)
       .off('value', bLim1On);
-    expect(await dumpListens(node)).to.equal('');
+    expect(dumpListens(node)).to.equal('');
   });
 
-  it('Limit with mix of null and non-null priorities.', async function() {
+  it('Limit with mix of null and non-null priorities.', function() {
     const node = getRandomNode();
 
     const children = [];
     node.limitToLast(5).on('child_added', function(childSnap) {
       children.push(childSnap.key);
     });
-    await repoCallbacksAdded(node);
 
     node.set({
       Vikrum: { '.priority': 1000, score: 1000, name: 'Vikrum' },
@@ -1779,7 +1749,7 @@ describe('Query Tests', function() {
   });
 
   it('Limit with mix of null and non-null priorities using server data', async function() {
-    const node = <Reference>getRandomNode();
+    const node = getRandomNode();
 
     const children = [];
     await node.set({
@@ -1802,7 +1772,7 @@ describe('Query Tests', function() {
     expect(children.join(',')).to.equal('Sally,James,Andrew,Mike,Vikrum');
   });
 
-  it('.on() with a context works.', async function() {
+  it('.on() with a context works.', function() {
     const ref = getRandomNode();
 
     const ListenerDoohickey = function() {
@@ -1814,7 +1784,6 @@ describe('Query Tests', function() {
 
     const l = new ListenerDoohickey();
     ref.on('value', l.onEvent, l);
-    await repoCallbacksAdded(ref);
 
     ref.set('test');
     expect(l.snap.val()).to.equal('test');
@@ -1826,7 +1795,7 @@ describe('Query Tests', function() {
     expect(l.snap.val()).to.equal('test');
   });
 
-  it('.once() with a context works.', async function() {
+  it('.once() with a context works.', function() {
     const ref = getRandomNode();
 
     const ListenerDoohickey = function() {
@@ -1838,7 +1807,6 @@ describe('Query Tests', function() {
 
     const l = new ListenerDoohickey();
     ref.once('value', l.onEvent, l);
-    await repoCallbacksAdded(ref);
 
     ref.set('test');
     expect(l.snap.val()).to.equal('test');
@@ -1848,14 +1816,13 @@ describe('Query Tests', function() {
     expect(l.snap.val()).to.equal('test');
   });
 
-  it('handles an update that deletes the entire window in a query', async function() {
+  it('handles an update that deletes the entire window in a query', function() {
     const ref = getRandomNode();
 
     const snaps = [];
     ref.limitToLast(2).on('value', function(snap) {
       snaps.push(snap.val());
     });
-    await repoCallbacksAdded(ref);
 
     ref.set({
       a: { '.value': 1, '.priority': 1 },
@@ -1873,7 +1840,7 @@ describe('Query Tests', function() {
     expect(snaps[1]).to.deep.equal({ a: 1 });
   });
 
-  it('handles an out-of-view query on a child', async function() {
+  it('handles an out-of-view query on a child', function() {
     const ref = getRandomNode();
 
     let parent = null;
@@ -1885,8 +1852,6 @@ describe('Query Tests', function() {
     ref.child('a').on('value', function(snap) {
       child = snap.val();
     });
-
-    await repoCallbacksAdded(ref);
 
     ref.set({ a: 1, b: 2 });
     expect(parent).to.deep.equal({ b: 2 });
@@ -1897,7 +1862,7 @@ describe('Query Tests', function() {
     expect(child).to.equal(1);
   });
 
-  it('handles a child query going out of view of the parent', async function() {
+  it('handles a child query going out of view of the parent', function() {
     const ref = getRandomNode();
 
     let parent = null;
@@ -1909,8 +1874,6 @@ describe('Query Tests', function() {
     ref.child('a').on('value', function(snap) {
       child = snap.val();
     });
-
-    await repoCallbacksAdded(ref);
 
     ref.set({ a: 1 });
     expect(parent).to.deep.equal({ a: 1 });
@@ -1923,7 +1886,7 @@ describe('Query Tests', function() {
     expect(child).to.equal(1);
   });
 
-  it('handles diverging views', async function() {
+  it('handles diverging views', function() {
     const ref = getRandomNode();
 
     let c = null;
@@ -1942,8 +1905,6 @@ describe('Query Tests', function() {
         d = snap.val();
       });
 
-    await repoCallbacksAdded(ref);
-
     ref.set({ a: 1, b: 2, c: 3 });
     expect(c).to.deep.equal({ c: 3 });
     expect(d).to.deep.equal({ c: 3 });
@@ -1961,8 +1922,6 @@ describe('Query Tests', function() {
       val = snap.val();
       ea.addEvent();
     });
-
-    await repoCallbacksAdded(ref);
 
     ref.set({ a: 1, b: 2 });
     expect(val).to.equal(2);
@@ -2101,7 +2060,7 @@ describe('Query Tests', function() {
   });
 
   it('handles once called on a node with a default listener and non-complete limit', async function() {
-    const ref = <Reference>getRandomNode();
+    const ref = getRandomNode();
 
     await ref.set({
       a: 1,
@@ -2555,7 +2514,7 @@ describe('Query Tests', function() {
     return ea.promise;
   });
 
-  it('Case 2003: Correctly get events for startAt/endAt queries when priority changes.', async function() {
+  it('Case 2003: Correctly get events for startAt/endAt queries when priority changes.', function() {
     const ref = getRandomNode();
     const addedFirst = [],
       removedFirst = [],
@@ -2585,8 +2544,6 @@ describe('Query Tests', function() {
       .on('child_removed', function(snap) {
         removedSecond.push(snap.key);
       });
-
-    await repoCallbacksAdded(ref);
 
     ref.child('a').setWithPriority('a', 5);
     expect(addedFirst).to.deep.equal(['a']);
@@ -2971,14 +2928,12 @@ describe('Query Tests', function() {
     expect(readVal).to.deep.equal({ a: 1, c: 3 });
   });
 
-  it('Latency compensation works with limit and pushed object.', async function() {
+  it('Latency compensation works with limit and pushed object.', function() {
     const ref = getRandomNode();
     const events = [];
     ref.limitToLast(3).on('child_added', function(s) {
       events.push(s.val());
     });
-
-    await repoCallbacksAdded(ref);
 
     // If you change this to ref.push('foo') it works.
     ref.push({ a: 'foo' });

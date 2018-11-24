@@ -24,7 +24,7 @@ import { Reference } from '../src/api/Reference';
 describe('DataSnapshot Tests', function() {
   /** @return {!DataSnapshot} */
   const snapshotForJSON = function(json) {
-    const dummyRef = <Reference>getRandomNode();
+    const dummyRef = getRandomNode();
     return new DataSnapshot(nodeFromJSON(json), dummyRef, PRIORITY_INDEX);
   };
 

@@ -93,7 +93,7 @@ export function getRandomNode(numNodes?: undefined): Reference;
 export function getRandomNode(numNodes: number): Array<Reference>;
 export function getRandomNode(numNodes?: number): Reference | Array<Reference> {
   if (numNodes === undefined) {
-    return <Reference>getRandomNode(1)[0];
+    return getRandomNode(1)[0];
   }
 
   let child;
@@ -206,12 +206,11 @@ export function getFreshRepoFromReference(ref) {
 }
 
 // Little helpers to get the currently cached snapshot / value.
-export async function getSnap(path: Reference): Promise<DataSnapshot> {
+export function getSnap(path) {
   let snap;
   const callback = function(snapshot) {
     snap = snapshot;
   };
-  await repoCallbacksAdded(path);
   path.once('value', callback);
   return snap;
 }
@@ -245,8 +244,4 @@ export function testRepoInfo(url) {
   if (!match) throw new Error('Couldnt get Namespace from passed URL');
   const [, ns] = match;
   return new ConnectionTarget(`${ns}.firebaseio.com`, true, ns, false);
-}
-
-export function repoCallbacksAdded(node: Query): Promise<void> {
-  return node.repo.eventCallbackAddQueue_;
 }
