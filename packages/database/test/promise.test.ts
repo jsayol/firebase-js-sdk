@@ -26,9 +26,11 @@ import { Reference } from '../src/api/Reference';
 // TODO: Fix the flakey test suite
 describe.skip('Promise Tests', function() {
   it('wraps Query.once', function() {
-    return getRandomNode().once('value').then(function(snap) {
-      expect(snap.val()).to.equal(null);
-    });
+    return getRandomNode()
+      .once('value')
+      .then(function(snap) {
+        expect(snap.val()).to.equal(null);
+      });
   });
 
   it('wraps Firebase.set', function() {
