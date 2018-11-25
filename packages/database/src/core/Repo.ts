@@ -86,7 +86,7 @@ export class Repo {
    * Persistence manager
    * @type {?PersistenceManager}
    */
-  private persistenceManager_: PersistenceManager;
+  private persistenceManager_: PersistenceManager | undefined;
 
   /**
    * @param {!RepoInfo} repoInfo_
@@ -634,21 +634,19 @@ export class Repo {
     query: Query,
     eventRegistration: EventRegistration
   ) {
-    // These are guaranteed not to raise events, since we're not passing in a cancelError. However, we can future-proof
-    // a little bit by handling the return values anyways.
-    let events;
-    if (query.path.getFront() === '.info') {
-      events = this.infoSyncTree_.removeEventRegistration(
-        query,
-        eventRegistration
-      );
-    } else {
-      events = this.serverSyncTree_.removeEventRegistration(
-        query,
-        eventRegistration
-      );
-    }
-    this.eventQueue_.raiseEventsAtPath(query.path, events);
+    const syncTree =
+      query.path.getFront() === '.info'
+        ? this.infoSyncTree_
+        : this.serverSyncTree_;
+
+    // These are guaranteed not to raise events, since we're not passing in a
+    // cancelError. However, we can future-proof a little bit by handling the
+    // return values anyways.
+    const cancelEvents = syncTree.removeEventRegistration(
+      query,
+      eventRegistration
+    );
+    this.eventQueue_.raiseEventsAtPath(query.path, cancelEvents);
   }
 
   interrupt() {

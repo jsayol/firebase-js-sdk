@@ -215,8 +215,8 @@ export function getSnap(path) {
   return snap;
 }
 
-export async function getVal(path) {
-  const snap = await getSnap(path);
+export function getVal(path) {
+  const snap = getSnap(path);
   return snap ? snap.val() : undefined;
 }
 

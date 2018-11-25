@@ -2139,38 +2139,36 @@ describe('Query Tests', function() {
 
     let readerLoaded = false,
       numEventsReceived = 0;
-    writer
-      .child('foo')
-      .set({ a: 1, b: 2, c: 3, d: 4, e: 5 }, function(error, dummy) {
-        reader
-          .child('foo')
-          .startAt()
-          .limitToFirst(4)
-          .on('value', function(snapshot) {
-            const val = snapshot.val();
-            if (!readerLoaded) {
-              readerLoaded = true;
-              expect(val).to.deep.equal({ a: 1, b: 2, c: 3, d: 4 });
+    writer.child('foo').set({ a: 1, b: 2, c: 3, d: 4, e: 5 }, function(error) {
+      reader
+        .child('foo')
+        .startAt()
+        .limitToFirst(4)
+        .on('value', function(snapshot) {
+          const val = snapshot.val();
+          if (!readerLoaded) {
+            readerLoaded = true;
+            expect(val).to.deep.equal({ a: 1, b: 2, c: 3, d: 4 });
 
-              // This update causes the following to happen:
-              // 1. An in-view child is set to null (b)
-              // 2. An in-view child has its value changed (c)
-              // 3. An in-view child is changed and bumped out-of-view (d)
-              // We expect to get null values for b and d, along with the new children and updated value for c
-              writer
-                .child('foo')
-                .update({ b: null, c: 'a', cc: 'new', cd: 'new2', d: 'gone' });
-            } else {
-              done();
-              expect(val).to.deep.equal({
-                a: 1,
-                c: 'a',
-                cc: 'new',
-                cd: 'new2'
-              });
-            }
-          });
-      });
+            // This update causes the following to happen:
+            // 1. An in-view child is set to null (b)
+            // 2. An in-view child has its value changed (c)
+            // 3. An in-view child is changed and bumped out-of-view (d)
+            // We expect to get null values for b and d, along with the new children and updated value for c
+            writer
+              .child('foo')
+              .update({ b: null, c: 'a', cc: 'new', cd: 'new2', d: 'gone' });
+          } else {
+            done();
+            expect(val).to.deep.equal({
+              a: 1,
+              c: 'a',
+              cc: 'new',
+              cd: 'new2'
+            });
+          }
+        });
+    });
   });
 
   it('update() at query root raises correct value event', function(done) {
@@ -2180,29 +2178,27 @@ describe('Query Tests', function() {
 
     let readerLoaded = false,
       numEventsReceived = 0;
-    writer
-      .child('foo')
-      .set({ bar: 'a', baz: 'b', bam: 'c' }, function(error, dummy) {
-        reader
-          .child('foo')
-          .limitToLast(10)
-          .on('value', function(snapshot) {
-            const val = snapshot.val();
-            if (!readerLoaded) {
-              readerLoaded = true;
-              expect(val.bar).to.equal('a');
-              expect(val.baz).to.equal('b');
-              expect(val.bam).to.equal('c');
-              writer.child('foo').update({ bar: 'd', bam: null, bat: 'e' });
-            } else {
-              expect(val.bar).to.equal('d');
-              expect(val.baz).to.equal('b');
-              expect(val.bat).to.equal('e');
-              expect(val.bam).to.equal(undefined);
-              done();
-            }
-          });
-      });
+    writer.child('foo').set({ bar: 'a', baz: 'b', bam: 'c' }, function(error) {
+      reader
+        .child('foo')
+        .limitToLast(10)
+        .on('value', function(snapshot) {
+          const val = snapshot.val();
+          if (!readerLoaded) {
+            readerLoaded = true;
+            expect(val.bar).to.equal('a');
+            expect(val.baz).to.equal('b');
+            expect(val.bam).to.equal('c');
+            writer.child('foo').update({ bar: 'd', bam: null, bat: 'e' });
+          } else {
+            expect(val.bar).to.equal('d');
+            expect(val.baz).to.equal('b');
+            expect(val.bat).to.equal('e');
+            expect(val.bam).to.equal(undefined);
+            done();
+          }
+        });
+    });
   });
 
   it('set() at query root raises correct value event', function(done) {
@@ -2212,29 +2208,27 @@ describe('Query Tests', function() {
 
     let readerLoaded = false,
       numEventsReceived = 0;
-    writer
-      .child('foo')
-      .set({ bar: 'a', baz: 'b', bam: 'c' }, function(error, dummy) {
-        reader
-          .child('foo')
-          .limitToLast(10)
-          .on('value', function(snapshot) {
-            const val = snapshot.val();
-            if (!readerLoaded) {
-              readerLoaded = true;
-              expect(val.bar).to.equal('a');
-              expect(val.baz).to.equal('b');
-              expect(val.bam).to.equal('c');
-              writer.child('foo').set({ bar: 'd', baz: 'b', bat: 'e' });
-            } else {
-              expect(val.bar).to.equal('d');
-              expect(val.baz).to.equal('b');
-              expect(val.bat).to.equal('e');
-              expect(val.bam).to.equal(undefined);
-              done();
-            }
-          });
-      });
+    writer.child('foo').set({ bar: 'a', baz: 'b', bam: 'c' }, function(error) {
+      reader
+        .child('foo')
+        .limitToLast(10)
+        .on('value', function(snapshot) {
+          const val = snapshot.val();
+          if (!readerLoaded) {
+            readerLoaded = true;
+            expect(val.bar).to.equal('a');
+            expect(val.baz).to.equal('b');
+            expect(val.bam).to.equal('c');
+            writer.child('foo').set({ bar: 'd', baz: 'b', bat: 'e' });
+          } else {
+            expect(val.bar).to.equal('d');
+            expect(val.baz).to.equal('b');
+            expect(val.bat).to.equal('e');
+            expect(val.bam).to.equal(undefined);
+            done();
+          }
+        });
+    });
   });
 
   it('listen for child_added events with limit and different types fires properly', function(done) {
@@ -2246,11 +2240,11 @@ describe('Query Tests', function() {
       gotA = false,
       gotB = false,
       gotC = false;
-    writer.child('a').set(1, function(error, dummy) {
-      writer.child('b').set('b', function(error, dummy) {
+    writer.child('a').set(1, function(error) {
+      writer.child('b').set('b', function(error) {
         writer
           .child('c')
-          .set({ deep: 'path', of: { stuff: true } }, function(error, dummy) {
+          .set({ deep: 'path', of: { stuff: true } }, function(error) {
             reader.limitToLast(3).on('child_added', function(snap) {
               const val = snap.val();
               switch (snap.key) {
@@ -2290,8 +2284,7 @@ describe('Query Tests', function() {
       gotC = false,
       readerLoaded = false;
     writer.set({ a: 'something', b: "we'll", c: 'overwrite ' }, function(
-      error,
-      dummy
+      error
     ) {
       reader.limitToLast(3).on('value', function(snapshot) {
         if (!readerLoaded) {
@@ -2342,7 +2335,7 @@ describe('Query Tests', function() {
       readerLoaded = false;
     writer.set(
       { a: 1, b: 'b', c: { deep: 'path', of: { stuff: true } } },
-      function(error, dummy) {
+      function(error) {
         reader.limitToLast(3).on('value', function(snapshot) {
           if (!readerLoaded) {
             readerLoaded = true;
@@ -2394,7 +2387,7 @@ describe('Query Tests', function() {
       readerLoaded = false;
     writer.set(
       { a: 1, b: 'b', c: { deep: 'path', of: { stuff: true } } },
-      function(error, dummy) {
+      function(error) {
         reader.limitToLast(3).on('value', function(snapshot) {
           if (!readerLoaded) {
             readerLoaded = true;
@@ -2444,7 +2437,7 @@ describe('Query Tests', function() {
       readerLoaded = false;
     writer.set(
       { a: 1, b: 'b', c: { deep: 'path', of: { stuff: true } } },
-      function(error, dummy) {
+      function(error) {
         reader.limitToLast(3).on('value', function(snapshot) {
           if (!readerLoaded) {
             readerLoaded = true;
